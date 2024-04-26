@@ -1,5 +1,6 @@
 import {Box, Spinner} from '@dagster-io/ui-components';
 import {useMemo, useRef, useState} from 'react';
+import {Link} from 'react-router-dom';
 import styled from 'styled-components';
 
 import {SVGSaveZoomLevel, useLastSavedZoomLevel} from './SavedZoomLevel';
@@ -146,12 +147,16 @@ export const AssetNodeLineageGraph = ({
                       e.stopPropagation();
                     }}
                   >
-                    <a
-                      href={assetDetailsPathForKey(key, {
-                        ...params,
-                        lineageScope: 'neighbors',
-                        lineageDepth: 1,
-                      })}
+                    <Link
+                      to={assetDetailsPathForKey(
+                        {path},
+                        {
+                          ...params,
+                          lineageScope: 'neighbors',
+                          lineageDepth: 1,
+                        },
+                      )}
+                      style={{textDecoration: 'none'}}
                     >
                       {!graphNode ? (
                         <AssetNodeLink assetKey={{path}} />
@@ -171,7 +176,7 @@ export const AssetNodeLineageGraph = ({
                           />
                         </AssetNodeContextMenuWrapper>
                       )}
-                    </a>
+                    </Link>
                   </foreignObject>
                 );
               })}
