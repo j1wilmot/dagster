@@ -1,11 +1,10 @@
 import {Box, Spinner} from '@dagster-io/ui-components';
 import {useMemo, useRef, useState} from 'react';
-import {useHistory} from 'react-router-dom';
 import styled from 'styled-components';
 
 import {SVGSaveZoomLevel, useLastSavedZoomLevel} from './SavedZoomLevel';
 import {assetDetailsPathForKey} from './assetDetailsPathForKey';
-import {AssetKey, AssetViewParams} from './types';
+import {AssetViewParams} from './types';
 import {AssetEdges} from '../asset-graph/AssetEdges';
 import {AssetGraphBackgroundContextMenu} from '../asset-graph/AssetGraphBackgroundContextMenu';
 import {MINIMAL_SCALE} from '../asset-graph/AssetGraphExplorer';
@@ -51,13 +50,6 @@ export const AssetNodeLineageGraph = ({
     useMemo(() => ({direction}), [direction]),
   );
   const viewportEl = useRef<SVGViewport>();
-  const history = useHistory();
-
-  const onClickAsset = (key: AssetKey) => {
-    history.push(
-      assetDetailsPathForKey(key, {...params, lineageScope: 'neighbors', lineageDepth: 1}),
-    );
-  };
 
   useLastSavedZoomLevel(viewportEl, layout, assetGraphId);
 
@@ -149,30 +141,37 @@ export const AssetNodeLineageGraph = ({
                     style={{overflow: 'visible'}}
                     onMouseEnter={() => setHighlighted([id])}
                     onMouseLeave={() => setHighlighted(null)}
-                    onClick={() => onClickAsset({path})}
                     onDoubleClick={(e) => {
                       viewportEl.current?.zoomToSVGBox(bounds, true, 1.2);
                       e.stopPropagation();
                     }}
                   >
-                    {!graphNode ? (
-                      <AssetNodeLink assetKey={{path}} />
-                    ) : scale < MINIMAL_SCALE ? (
-                      <AssetNodeContextMenuWrapper {...contextMenuProps}>
-                        <AssetNodeMinimal
-                          definition={graphNode.definition}
-                          selected={graphNode.id === assetGraphId}
-                          height={bounds.height}
-                        />
-                      </AssetNodeContextMenuWrapper>
-                    ) : (
-                      <AssetNodeContextMenuWrapper {...contextMenuProps}>
-                        <AssetNode
-                          definition={graphNode.definition}
-                          selected={graphNode.id === assetGraphId}
-                        />
-                      </AssetNodeContextMenuWrapper>
-                    )}
+                    <a
+                      href={assetDetailsPathForKey(key, {
+                        ...params,
+                        lineageScope: 'neighbors',
+                        lineageDepth: 1,
+                      })}
+                    >
+                      {!graphNode ? (
+                        <AssetNodeLink assetKey={{path}} />
+                      ) : scale < MINIMAL_SCALE ? (
+                        <AssetNodeContextMenuWrapper {...contextMenuProps}>
+                          <AssetNodeMinimal
+                            definition={graphNode.definition}
+                            selected={graphNode.id === assetGraphId}
+                            height={bounds.height}
+                          />
+                        </AssetNodeContextMenuWrapper>
+                      ) : (
+                        <AssetNodeContextMenuWrapper {...contextMenuProps}>
+                          <AssetNode
+                            definition={graphNode.definition}
+                            selected={graphNode.id === assetGraphId}
+                          />
+                        </AssetNodeContextMenuWrapper>
+                      )}
+                    </a>
                   </foreignObject>
                 );
               })}
