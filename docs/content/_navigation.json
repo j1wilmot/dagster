@@ -816,6 +816,10 @@
         "path": "/integrations/dbt",
         "children": [
           {
+            "title": "Quickstart",
+            "path": "/integrations/dbt/quickstart"
+          },
+          {
             "title": "dbt & Dagster tutorial",
             "path": "/integrations/dbt/using-dbt-with-dagster",
             "children": [
