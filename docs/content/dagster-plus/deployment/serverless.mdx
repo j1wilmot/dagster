@@ -286,6 +286,25 @@ If your organization begins to hit the limitations of Serverless, you should tra
 
 To switch to Hybrid, navigate to **Status > Agents** in your Dagster+ account. On this page, you can disable the Serverless agent on and view instructions for enabling Hybrid.
 
+After changing the deployment type, you will need to update your code locations' images and configuration to be compatible with the particular flavor Hybrid agent that you chose.
+
+Be sure to review the following steps:
+
+- Update the code location configurations in [`dagster_cloud.yaml`](/dagster-plus/managing-deployments/dagster-cloud-yaml) to adapt it as needed for the specificities of the agent you are using if necessary. See these references for help:
+
+  - [Amazon ECS agent configuration reference](/dagster-plus/deployment/agents/amazon-ecs/configuration-reference#per-location-configuration)
+  - [Kubernetes agent configuration reference](/dagster-plus/deployment/agents/kubernetes/configuration-reference#per-location-configuration)
+  - [Docker agent configuration reference](/dagster-plus/deployment/agents/docker/configuration-reference#docker-agent-configuration-reference)
+
+- Replace your current build process and use it to publish new images for your code locations and update your deployment with the new configurations.
+
+  - [Step 4. Configure CI/CD for your project](/dagster-plus/getting-started#step-4-configure-cicd-for-your-project)
+
+- Some features of Serverless deployments needs to be replaced with Hybrid equivalent:
+
+  - Using [lifecycle hooks](/dagster-plus/deployment/serverless#disabling-pex-based-deploys) to customize the code location runtime environment can be replaced by customizing the [`Dockerfile`](https://github.com/dagster-io/dagster-cloud-hybrid-quickstart/blob/main/Dockerfile) used to build its image.
+  - [Non-isolated runs](/dagster-plus/deployment/serverless#non-isolated-runs) have no direct equivalent in Hybrid deployments. However, for light jobs and steps, you can explore using the [`in_process_executor` or `multiprocess_executor`](\_apidocs/execution#executors) for specific jobs or for whole code locations to reduce the overhead.
+
 ---
 
 ## Security and data protection
