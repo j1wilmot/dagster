@@ -303,7 +303,7 @@ Be sure to review the following steps:
 - Some features of Serverless deployments needs to be replaced with Hybrid equivalent:
 
   - Using [lifecycle hooks](/dagster-plus/deployment/serverless#disabling-pex-based-deploys) to customize the code location runtime environment can be replaced by customizing the [`Dockerfile`](https://github.com/dagster-io/dagster-cloud-hybrid-quickstart/blob/main/Dockerfile) used to build its image.
-  - [Non-isolated runs](/dagster-plus/deployment/serverless#non-isolated-runs) have no direct equivalent in Hybrid deployments. However, for light jobs and steps, you can explore using the [`in_process_executor` or `multiprocess_executor`](/_apidocs/execution#executors) for specific jobs or for whole code locations to reduce the overhead.
+  - [Non-isolated runs](/dagster-plus/deployment/serverless#non-isolated-runs) have no direct equivalent in Hybrid deployments. However, you can explore using the [`in_process_executor` or `multiprocess_executor`](/_apidocs/execution#executors) for specific jobs or for whole code locations to reduce the overhead.
 
 ---
 
