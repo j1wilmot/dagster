@@ -961,6 +961,10 @@ class StepExecutionContext(PlanExecutionContext, IStepContext):
     def input_asset_records(self) -> Optional[Mapping[AssetKey, Optional["InputAssetVersionInfo"]]]:
         return self._data_version_cache.input_asset_version_info
 
+    # throws if not prefetched
+    def get_input_asset_version_info(self, key: AssetKey) -> Optional["InputAssetVersionInfo"]:
+        return self._data_version_cache.input_asset_version_info[key]
+
     def maybe_fetch_and_get_input_asset_version_info(
         self, key: AssetKey
     ) -> Optional["InputAssetVersionInfo"]:
