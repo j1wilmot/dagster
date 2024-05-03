@@ -574,7 +574,7 @@ class StepExecutionContext(PlanExecutionContext, IStepContext):
         self._output_metadata: Dict[str, Any] = {}
         self._seen_outputs: Dict[str, Union[str, Set[str]]] = {}
 
-        self._data_version_cache = DataVersionCache(_context=self)
+        self._data_version_cache = DataVersionCache(step_context=self)
 
         self._requires_typed_event_stream = False
         self._typed_event_stream_error_message = None

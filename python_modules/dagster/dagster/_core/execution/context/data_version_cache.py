@@ -1,7 +1,5 @@
 from typing import TYPE_CHECKING
 
-from dagster._model import DagsterModel
-
 """This module contains the execution context objects that are internal to the system.
 Not every property on these should be exposed to random Jane or Joe dagster user
 so we have a different layer of objects that encode the explicit public API
@@ -58,10 +56,13 @@ class InputAssetVersionInfo:
     timestamp: float
 
 
-class DataVersionCache(DagsterModel):
-    _context: "StepExecutionContext"
-    input_asset_version_info: Dict[AssetKey, Optional["InputAssetVersionInfo"]] = {}
-    values: Dict[AssetKey, "DataVersion"] = {}
+class DataVersionCache:
+    __slots__ = ["_context", "input_asset_version_info", "values"]
+
+    def __init__(self, step_context: "StepExecutionContext") -> None:
+        self._context = step_context
+        self.input_asset_version_info: Dict[AssetKey, Optional["InputAssetVersionInfo"]] = {}
+        self.values: Dict[AssetKey, "DataVersion"] = {}
 
     def set_data_version(self, asset_key: AssetKey, data_version: "DataVersion") -> None:
         self.values[asset_key] = data_version

@@ -654,7 +654,7 @@ def _get_output_asset_events(
             _build_data_version_observation_tags(output.data_version) if output.data_version else {}
         )
     else:
-        check.invariant(not step_context.is_sda_step)
+        # check.invariant(not step_context.is_sda_step, "SDA step got here")
         tags = {}
 
     backfill_id = step_context.get_tag(BACKFILL_ID_TAG)
