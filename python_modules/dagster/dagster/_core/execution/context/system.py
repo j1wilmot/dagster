@@ -340,7 +340,7 @@ class PlanExecutionContext(IPlanContext):
         # TODO move this before construction to that StepExecutionContext is immutable against
         # -- schrockn 2024-05-03
         if is_step_in_asset_graph_layer(step, self.job_def):
-            context._data_version_cache.fetch_external_input_asset_version_info() # noqa: SLF001
+            context._data_version_cache.fetch_external_input_asset_version_info()  # noqa: SLF001
 
         return context
 
