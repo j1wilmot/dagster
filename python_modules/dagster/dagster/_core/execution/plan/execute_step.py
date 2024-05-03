@@ -622,6 +622,7 @@ def _get_output_asset_events(
         and asset_key in step_context.job_def.asset_layer.executable_asset_keys
     ):
         assert isinstance(output, Output)
+        check.invariant(step_context.is_sda_step)
         code_version = _get_code_version(asset_key, step_context)
         input_provenance_data = _get_input_provenance_data(asset_key, step_context)
         cached_data_version = (
@@ -653,6 +654,7 @@ def _get_output_asset_events(
             _build_data_version_observation_tags(output.data_version) if output.data_version else {}
         )
     else:
+        check.invariant(not step_context.is_sda_step)
         tags = {}
 
     backfill_id = step_context.get_tag(BACKFILL_ID_TAG)
