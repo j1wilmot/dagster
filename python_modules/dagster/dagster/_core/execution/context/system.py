@@ -343,6 +343,15 @@ class PlanExecutionContext(IPlanContext):
         if is_step_in_asset_graph_layer(step, self.job_def):
             context._data_version_cache.fetch_external_input_asset_version_info()  # noqa: SLF001
 
+            check_names_by_asset_key = (
+                context.job_def.asset_layer.check_names_by_asset_key_by_node_handle.get(
+                    context.node_handle.root
+                )
+            )
+
+            context.prefetch_input_asset_version_infos((check_names_by_asset_key or {}).keys())
+
+
         return context
 
     @property
@@ -966,7 +975,7 @@ class StepExecutionContext(PlanExecutionContext, IStepContext):
     def get_input_asset_version_info(self, key: AssetKey) -> Optional["InputAssetVersionInfo"]:
         return self._data_version_cache.input_asset_version_info[key]
 
-    def prefetch_input_asset_version_infos(self, keys: Sequence[AssetKey]) -> None:
+    def prefetch_input_asset_version_infos(self, keys: Iterable[AssetKey]) -> None:
         return self._data_version_cache.prefetch_input_asset_version_infos(keys)
 
     def maybe_fetch_and_get_input_asset_version_info(
