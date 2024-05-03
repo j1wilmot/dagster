@@ -15,7 +15,6 @@ from typing import (
     Mapping,
     NamedTuple,
     Optional,
-    Sequence,
     Set,
     Union,
     cast,
@@ -350,7 +349,6 @@ class PlanExecutionContext(IPlanContext):
             )
 
             context.prefetch_input_asset_version_infos((check_names_by_asset_key or {}).keys())
-
 
         return context
 
