@@ -15,6 +15,7 @@ from typing import (
     Mapping,
     NamedTuple,
     Optional,
+    Sequence,
     Set,
     Union,
     cast,
@@ -964,6 +965,9 @@ class StepExecutionContext(PlanExecutionContext, IStepContext):
     # throws if not prefetched
     def get_input_asset_version_info(self, key: AssetKey) -> Optional["InputAssetVersionInfo"]:
         return self._data_version_cache.input_asset_version_info[key]
+
+    def prefetch_input_asset_version_infos(self, keys: Sequence[AssetKey]) -> None:
+        return self._data_version_cache.prefetch_input_asset_version_infos(keys)
 
     def maybe_fetch_and_get_input_asset_version_info(
         self, key: AssetKey

@@ -97,6 +97,10 @@ class DataVersionCache:
         for key in all_dep_keys:
             self._fetch_input_asset_version_info(key)
 
+    def prefetch_input_asset_version_infos(self, keys: Sequence[AssetKey]) -> None:
+        for key in keys:
+            self._fetch_input_asset_version_info(key)
+
     def _fetch_input_asset_version_info(self, key: AssetKey) -> None:
         from dagster._core.definitions.data_version import (
             extract_data_version_from_entry,

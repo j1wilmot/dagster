@@ -616,7 +616,8 @@ def _get_output_asset_events(
     # materialization.
     step_context.wipe_input_asset_version_info(asset_key)
     # rewarm cache
-    step_context.maybe_fetch_and_get_input_asset_version_info(asset_key)
+    step_context.prefetch_input_asset_version_infos([asset_key])
+
     tags: Dict[str, str]
     if (
         execution_type == AssetExecutionType.MATERIALIZATION
