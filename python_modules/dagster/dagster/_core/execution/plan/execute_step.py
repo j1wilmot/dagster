@@ -618,7 +618,7 @@ def _get_output_asset_events(
     tags: Dict[str, str]
     if (
         execution_type == AssetExecutionType.MATERIALIZATION
-        and step_context.is_external_input_asset_version_info_loaded
+        and step_context.is_sda_step
         and asset_key in step_context.job_def.asset_layer.executable_asset_keys
     ):
         assert isinstance(output, Output)
