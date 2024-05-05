@@ -14,6 +14,7 @@ from dagster._core.definitions.assets import AssetsDefinition
 from dagster._core.execution.context.compute import AssetExecutionContext
 from dagster._core.pipes.context import PipesExecutionResult
 from dagster._core.pipes.subprocess import PipesSubprocessClient
+from dagster._core.storage.io_manager import IOManager
 
 try:
     from yaml import CLoader as Loader
@@ -42,13 +43,13 @@ def compute_file_hash(file_path, hash_algorithm="sha256") -> Any:
     return file_hash
 
 
-def deps_from_metadata_cls(raw_manifest_obj: dict) -> Sequence[CoercibleToAssetDep]:
-    if not raw_manifest_obj or "deps" not in raw_manifest_obj:
+def deps_from_asset_manifest(raw_asset_manifest_obj: dict) -> Sequence[CoercibleToAssetDep]:
+    if not raw_asset_manifest_obj or "deps" not in raw_asset_manifest_obj:
         return []
 
     return [
         AssetKey.from_user_string(dep) if isinstance(dep, str) else dep
-        for dep in raw_manifest_obj["deps"]
+        for dep in raw_asset_manifest_obj["deps"]
     ]
 
 
@@ -65,12 +66,12 @@ def build_description_from_python_file(file_path: Path) -> str:
 class NopeAssetManifest:
     def __init__(
         self,
-        manifest_obj,
+        asset_manifest_obj,
         full_python_path: Path,
         group_folder: Path,
         asset_key_parts: List[str],
     ) -> None:
-        self.manifest_obj = manifest_obj or {}
+        self.asset_manifest_obj = asset_manifest_obj or {}
         self.full_python_path = full_python_path
         self.group_folder = group_folder
         self.asset_key_parts = asset_key_parts
@@ -81,7 +82,7 @@ class NopeAssetManifest:
 
     @property
     def deps(self) -> Sequence[CoercibleToAssetDep]:
-        return deps_from_metadata_cls(self.manifest_obj)
+        return deps_from_asset_manifest(self.asset_manifest_obj)
 
     @property
     def description(self) -> str:
@@ -101,15 +102,15 @@ class NopeAssetManifest:
 
     @property
     def tags(self) -> dict:
-        return self.manifest_obj.get("tags", {})
+        return self.asset_manifest_obj.get("tags", {})
 
     @property
     def metadata(self) -> dict:
-        return self.manifest_obj.get("metadata", {})
+        return self.asset_manifest_obj.get("metadata", {})
 
     @property
     def owners(self) -> List[str]:
-        return self.manifest_obj.get("owners", [])
+        return self.asset_manifest_obj.get("owners", [])
 
     @property
     def asset_spec(self) -> AssetSpec:
@@ -125,7 +126,7 @@ class NopeAssetManifest:
         )
 
 
-class NopeExecutionTargetManifest:
+class NopeInvocationTargetManifest:
     file_path: Path
     asset_spec: AssetSpec
 
@@ -139,24 +140,24 @@ class NopeExecutionTargetManifest:
     ) -> None:
         self.group_folder = group_folder
         self.full_python_path = full_python_path
-        self.manifest_object = (
+        self.yaml_file_as_object = (
             yaml.load(full_manifest_path.read_text(), Loader=Loader) if full_manifest_path else {}
         )
         self.asset_manifest_class = asset_manifest_class
 
     @property
     def kind(self) -> str:
-        return self.manifest_object["kind"]
+        return self.yaml_file_as_object["kind"]
 
     @property
     def asset_manifests(self) -> Sequence[NopeAssetManifest]:
-        if self.manifest_object and "assets" in self.manifest_object:
-            raw_asset_manifests = self.manifest_object["assets"]
+        if self.yaml_file_as_object and "assets" in self.yaml_file_as_object:
+            raw_asset_manifests = self.yaml_file_as_object["assets"]
             asset_manifests = []
             for asset_name, raw_asset_manifest in raw_asset_manifests.items():
                 asset_manifests.append(
                     self.asset_manifest_class(
-                        manifest_obj=raw_asset_manifest,
+                        asset_manifest_obj=raw_asset_manifest,
                         full_python_path=self.full_python_path,
                         group_folder=self.group_folder,
                         asset_key_parts=asset_name.split("."),
@@ -166,7 +167,7 @@ class NopeExecutionTargetManifest:
         else:
             return [
                 self.asset_manifest_class(
-                    self.manifest_object,
+                    self.yaml_file_as_object,
                     self.full_python_path,
                     self.group_folder,
                     asset_key_parts=self.full_python_path.stem.split("."),
@@ -195,15 +196,16 @@ class NopeExecutionTargetManifest:
 
 
 class NopeExecutionTarget:
-    def __init__(self, script_manifest: NopeExecutionTargetManifest):
+    def __init__(self, script_manifest: NopeInvocationTargetManifest):
         self._script_manifest = script_manifest
 
+    # TODO: infer this from execute args
     @property
     @abstractmethod
     def required_resource_keys(self) -> set: ...
 
     @property
-    def script_manifest(self) -> NopeExecutionTargetManifest:
+    def script_manifest(self) -> NopeInvocationTargetManifest:
         return self._script_manifest
 
     def to_assets_def(self) -> AssetsDefinition:
@@ -218,7 +220,7 @@ class NopeExecutionTarget:
 
             resource_dict = copy.copy(context.resources.original_resource_dict)
             del resource_dict["io_manager"]
-            return self.execute(context=context, **resource_dict)
+            return self.invoke(context=context, **resource_dict)
 
         return _nope_multi_asset
 
@@ -233,8 +235,10 @@ class NopeExecutionTarget:
     def python_script_path(self) -> str:
         return str(self.script_manifest.full_python_path.resolve())
 
+    # Resources as kwargs. Must match set in required_resource_keys
+    # Can return anything that the multi_asset decorator can accept
     @abstractmethod
-    def execute(self, context: AssetExecutionContext, **kwargs) -> Any: ...
+    def invoke(self, context: AssetExecutionContext, **kwargs) -> Any: ...
 
 
 class NopeSubprocessExecutionTarget(NopeExecutionTarget):
@@ -242,17 +246,25 @@ class NopeSubprocessExecutionTarget(NopeExecutionTarget):
     def required_resource_keys(self) -> set:
         return {"subprocess_client"}
 
-    def execute(
+    def invoke(
         self, context: AssetExecutionContext, subprocess_client: PipesSubprocessClient
     ) -> Iterable[PipesExecutionResult]:
         command = [self.python_executable_path, self.python_script_path]
         return subprocess_client.run(context=context, command=command).get_results()
 
 
+# Nope doesn't support IO managers, so just provide a noop one
+class NoopIOManager(IOManager):
+    def handle_output(self, context, obj) -> None: ...
+
+    def load_input(self, context) -> None:
+        return None
+
+
 class NopeProject:
     @classmethod
     def create_execution_target(
-        cls, script_manifest: NopeExecutionTargetManifest
+        cls, script_manifest: NopeInvocationTargetManifest
     ) -> NopeExecutionTarget:
         return NopeSubprocessExecutionTarget(script_manifest)
 
@@ -266,7 +278,7 @@ class NopeProject:
     def script_manifest_class(cls) -> Type:
         if hasattr(cls, "ExecutionTargetManifest"):
             return getattr(cls, "ExecutionTargetManifest")
-        return NopeExecutionTargetManifest
+        return NopeInvocationTargetManifest
 
     @classmethod
     def make_assets_defs(
@@ -302,9 +314,16 @@ class NopeProject:
     def make_definitions(cls, resources: Optional[Mapping[str, Any]] = None) -> "Definitions":
         from dagster._core.definitions.definitions_class import Definitions
 
+        # TODO. When we add support for more default invocation targtes, make
+        # an initial pass across the manifests to see what resources we actually
+        # need to create
+
         return Definitions(
             assets=NopeProject.make_assets_defs(),
-            resources=resources if resources else {"subprocess_client": PipesSubprocessClient()},
+            resources={
+                **{"io_manager": NoopIOManager()}, # Nope doesn't support IO managers
+                **(resources or {"subprocess_client": PipesSubprocessClient()}), 
+            },
         )
 
     @classmethod

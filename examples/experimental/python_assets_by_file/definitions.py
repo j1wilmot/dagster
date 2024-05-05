@@ -1,6 +1,6 @@
 from typing import List
 
-from dagster._nope.project import NopeAssetManifest, NopeExecutionTargetManifest, NopeProject
+from dagster._nope.project import NopeAssetManifest, NopeInvocationTargetManifest, NopeProject
 
 
 class ProjectFooBarProject(NopeProject):
@@ -20,7 +20,7 @@ class ProjectFooBarProject(NopeProject):
                 return ["team:foobar"]
             return owners_from_file
 
-    class ExecutionTargetManifest(NopeExecutionTargetManifest):
+    class ExecutionTargetManifest(NopeInvocationTargetManifest):
         @property
         def tags(self) -> dict:
             return {**{"kind": "python"}, **super().tags}

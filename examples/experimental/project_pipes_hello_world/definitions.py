@@ -4,12 +4,12 @@ from dagster import AssetExecutionContext, Definitions, PipesSubprocessClient
 from dagster._nope.project import (
     NopeAssetManifest,
     NopeExecutionTarget,
-    NopeExecutionTargetManifest,
+    NopeInvocationTargetManifest,
     NopeProject,
 )
 
 
-class HelloWorldProjectExecutionTargetManifest(NopeExecutionTargetManifest):
+class HelloWorldProjectExecutionTargetManifest(NopeInvocationTargetManifest):
     @property
     def tags(self) -> dict:
         return {**{"kind": "python"}, **super().tags}
@@ -33,7 +33,7 @@ class HelloWorldProjectScript(NopeExecutionTarget):
     def script_manifest_class(cls) -> Type:
         return HelloWorldProjectExecutionTargetManifest
 
-    def execute(self, context: AssetExecutionContext, subprocess_client: PipesSubprocessClient):
+    def invoke(self, context: AssetExecutionContext, subprocess_client: PipesSubprocessClient):
         command = [self.python_executable_path, self.python_script_path]
         return subprocess_client.run(context=context, command=command).get_results()
 

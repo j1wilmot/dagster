@@ -2,7 +2,7 @@ from typing import Dict, Type
 
 from dagster._nope.project import (
     NopeAssetManifest,
-    NopeExecutionTargetManifest,
+    NopeInvocationTargetManifest,
     NopeProject,
     NopeSubprocessExecutionTarget,
 )
@@ -18,7 +18,7 @@ class CustomPipesScript(NopeSubprocessExecutionTarget):
                 return ["team:foobar"]
             return owners_from_file
 
-    class ExecutionTargetManifest(NopeExecutionTargetManifest):
+    class ExecutionTargetManifest(NopeInvocationTargetManifest):
         @property
         def tags(self) -> dict:
             return {**{"kind": "python"}, **super().tags}
