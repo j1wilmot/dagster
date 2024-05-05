@@ -71,7 +71,7 @@ Now we want to build the asset graph and leverage it. For that we need dependenc
 Now we need to tell the system about this dependency. We do that via a manifest file which, in addition to kind, also informs the system that it has an upstream dependency on `asset_one`.
 
 ```yaml
-kind: subprocess
+target: subprocess
 deps:
   - group_a/asset_one
 ```
@@ -109,57 +109,11 @@ Just a few things to note:
 * Dependencies must be fully qualified (no asset key prefixes or anything) and it parses forward slashes, which is much more convenient than arrays of strings. Requiring full qualification is an explicit tradeoff for obviousness/debuggability/clarity at the expense of some additional typing when writing manifest files.
 * The asset key by default is `{group_name}/{asset_name}`
 
-## Customizing the platform 
+## Multiple assets in a invocation target 
 
-As a platform owner you will want to customize this for your stakeholders. Pipes Projects provide pluggability points to do that easily, allowing your stakeholders to write manifest files and code in external execution environments (e.g. scripts, notebooks, code in hosted runtimes), but allowing you to programmaticaly control the create of asset definitions.
+Sometimes scripts and computations materialize more than a single asset. Nope supports that through its concept of _invocation targets_. 
 
-For example, let's imagine that we wanted to automatically set the "compute kind" tag to be Python for display in the asset graph and, for every asset, make the default owner "team:foobar" if manifest did not specify an owner. But we decided that an asset author is allowed to completely override the field, rather than merge.
-
-"Compute kinds" are attached to scripts, not assets. We have to create a new class that inherits from `PipesScriptManifest` and customize the tags behavior:
-
-```python
-class HelloWorldProjectScriptManifest(PipesScriptManifest):
-    @property
-ig   def tags(self) -> dict:
-        # makes the kind tag "python" if it doesn't exist. User can override with their
-        # own kind tag in the manifest
-        return {**{"kind": "python"}, **super().tags}
-```
-
-Then you need to inform the `HelloWorldProjectScript` class to use that manifest type. To do this you have to override the `script_manifest_class` class method:
-
-```python
-class HelloWorldProjectScript(PipesScript):
-    @classmethod
-    def script_manifest_class(cls) -> Type:
-        return HelloWorldProjectScriptManifest
-```
-
-Next we want to do a similar thing at the asset level. For that we override a `PipesAssetManifest`, and in similar fashion, override a class method in our `HelloWorldProjectScript` class.
-
-```python
-class HelloWorldProjectAssetManifest(PipesAssetManifest):
-    @property
-    def owners(self) -> list:
-        owners_from_file = super().owners
-        if not owners_from_file:
-            return ["team:foobar"]
-        return owners_from_file
-
-class HelloWorldProjectScript(PipesScript):
-    @classmethod
-    def asset_manifest_class(cls) -> Type:
-        return HelloWorldProjectAssetManifest
-    ...
-```
-
-*** Commentary
-
-We are going to need even more customization levers than this, but I think this approach is a good "simple things simple, hard things possible" interface. You can completely take over the creation of specs by overriding the appropriate properties (e.g. `asset_spec` on `PipesAssetManifest`)
-
-## Multiple assets in a single script
-
-Sometimes scripts materialize more than a single asset. Pipes Projects support that. You create a script as normal. In this case we are going to simulate creating two assets, `asset_three` and `asset_four`. We create a script in `assets_three_and_four.py`
+Create a script. In this case we are going to simulate creating two assets, `asset_three` and `asset_four`. We create a script in `assets_three_and_four.py` and return metadata to Dagster using `dagster_pipes`.
 
 ```python
 from dagster_pipes import open_dagster_pipes
@@ -175,7 +129,7 @@ if __name__ == "__main__":
         main(pipes)
 ```
 
-Now we need to inform the system that there are two assets, and that they both depend on `asset_two`. We can do this via the manifest. By using the top-level key `assets` we inform the manifest system there are multiple assets encoded in the manifest:
+Now we need to inform the system that this script materializes two assets, and that they both depend on `asset_two`. We can do this via the manifest. By using the top-level key `assets` we inform the manifest system there are multiple assets encoded in the manifest:
 
 `assets_three_and_four.yaml`:
 
@@ -189,10 +143,50 @@ assets:
       - group_a/asset_two
 ```
 
+In the language of Nope, `asset_three_and_four` is single _invocation target_ that materializes two _assets_. 
+
 ### Commentary
 
-* It's a bit gross to have two file formats, but I did not want have to double specify asset name in the filename and the file in the single-asset case. Open to suggestions here.
 * It would be straight forward to extend this with a top-level `checks` key to support asset checks.
+
+## Customizing the platform 
+
+As a platform owner you will want to customize this for your stakeholders. Nope provide pluggability points for customizing manifests as well as invocation behavior, allowing your stakeholders to write manifest files and code in invocation target environments (e.g. scripts, notebooks, code in hosted runtimes), but allowing you to programmaticaly control the create of asset definitions.
+
+For example, let's imagine that we wanted to automatically set the "compute kind" tag to be Python for display in the asset graph and, for every asset, make the default owner "team:foobar" if manifest did not specify an owner. But we decided that an asset author is allowed to completely override the field, rather than merge. This is the platform owner making cross-cutting business logic decisions in the platform, that she wants to encode in code.
+
+The first step is to create a custom subclass for your project.
+
+```python
+class TutorialProject(NopeProject):
+    ...
+
+defs = TutorialProject.make_definitions()
+```
+
+Nope has "invocations targets", which correspond to an invocation of some external runtime. Previously in the tutorial you specified `target: subprocess` in the manifest file, indicating the the invocation target was "subprocess". The yaml file is technically an _invocation target manifest_.
+
+"Compute kinds" are attached to invocation targets so we have to customize the invocation target manifest. We have to create a new class that inherits from `NopeInvocationTargetManifest` and customize the tags behavior. Thie class must be named `InvocationTargetManifest` and be within your custom project class.
+
+```python
+class TutorialProject(NopeProject):
+    class InvocationTargetManifest(NopeInvocationTargetManifest):
+        @property
+        def tags(self) -> dict:
+            return {**{"kind": "python"}, **super().tags}
+```
+
+Next we want to do a similar thing at the asset level. For that we override a `PipesAssetManifest`, and in similar fashion, override a class method in our `HelloWorldProjectScript` class.
+
+```python
+class TutorialProject(NopeProject):
+    class AssetManifest(NopeAssetManifest):
+        @property
+        def owners(self) -> list:
+            owners_from_manifest_file = super().owners
+            return owners_from_manifest_file if owners_from_manifest_file else ["team:foobar"]
+    ...
+```
 
 ## Future work
 

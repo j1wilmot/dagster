@@ -6,18 +6,16 @@ from dagster._nope.project import (
 
 
 class TutorialProject(NopeProject):
-    class AssetManifest(NopeAssetManifest):
-        @property
-        def owners(self) -> list:
-            owners_from_file = super().owners
-            if not owners_from_file:
-                return ["team:foobar"]
-            return owners_from_file
-
     class InvocationTargetManifest(NopeInvocationTargetManifest):
         @property
         def tags(self) -> dict:
             return {**{"kind": "python"}, **super().tags}
+
+    class AssetManifest(NopeAssetManifest):
+        @property
+        def owners(self) -> list:
+            owners_from_manifest_file = super().owners
+            return owners_from_manifest_file if owners_from_manifest_file else ["team:foobar"]
 
 
 defs = TutorialProject.make_definitions()
