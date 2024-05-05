@@ -27,9 +27,11 @@ To get started you'll need to create a `definitions.py` file and a `defs` folder
 
 ```python 
 # definitions.py
-from dagster._nope import NopeProject
+from pathlib import Path
 
-defs = NopeProject.make_definitions()
+from dagster._nope.project import NopeProject
+
+defs = NopeProject.make_definitions(defs_path=Path(__file__).resolve().parent / Path("defs"))
 ```
 
 This is a vanilla Dagster `Definitions` object, build with a special factory function, `NopeProject.make_definitions`.
@@ -173,7 +175,7 @@ The first step is to create a custom subclass for your project.
 class TutorialProject(NopeProject):
     ...
 
-defs = TutorialProject.make_definitions()
+defs = TutorialProject.make_definitions(defs_path=Path(__file__).resolve().parent / Path("defs"))
 ```
 
 Nope has _invocations targets_, which correspond to an invocation of some external runtime. Previously in the tutorial you specified `target: subprocess` in the manifest file, indicating the the invocation target was `subprocess`. The yaml file is technically an _invocation target manifest_.
@@ -259,6 +261,7 @@ class TutorialProject(NopeProject):
 
 
 defs = TutorialProject.make_definitions(
+    defs_path=Path(__file__).resolve().parent / Path("defs"),
     resources={
         "fancy_runtime_resource": FancyRuntimeResource(),
         "subprocess_client": PipesSubprocessClient(),
