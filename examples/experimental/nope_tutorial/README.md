@@ -10,7 +10,9 @@ Neither of these terms is sufficient to describe a large swath of practitioners 
 
 They are "medium code" developers. They write software in Turing-complete languages or transformation languages such as SQL. However they are also not traditional full-time application developers and have different requirements. Data scientists, data engineers, analytics engineers often want to work this way, as do some software engineers when operating within the data platform context.
 
-Nope assumes that medium-code engineers already have a Python environment and toolchain for writing and deploying their business logic. This might be a notebooking platform, a compute environment like Ray, Modal, or Sagemaker, or a bespoke toolchain. **It is a *non-goal* of Nope to improve or replace that existing workflow.**
+Nope assumes that medium-code engineers already have a Python environment and toolchain for writing and deploying their business logic. This might be a notebooking platform, a compute environment like Ray, Modal, or Sagemaker, or a bespoke toolchain.
+
+**It is a *non-goal* of Nope to improve or replace that existing medium-code workflow.**
 
 Instead the goal of Nope is to allow those users to incorporate their code into the Dagster Asset Graph without learning another Python Environment (hence the name Nope: "NO Python Environment"). The success criteria for the practitioner is straightforward: They should be able to author a yaml file which plugs their existing script/computation into the data platform without installing or interacting with an additional Python environment.
 
