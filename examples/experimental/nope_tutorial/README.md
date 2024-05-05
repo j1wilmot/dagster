@@ -23,8 +23,8 @@ To get started you'll need to create a `definitions.py` file and a `defs` folder
 * `definitions.py` is the file that actually creates a `Definitions` object. 
 * `defs` is the folder that contains all the business logic for your assets. The code in `definitions.py` introspects `defs` to build the asset graph.
 
-`definitions.py`:
 ```python 
+# definitions.py
 from dagster._nope import NopeProject
 
 defs = NopeProject.make_definitions()
@@ -45,6 +45,7 @@ if __name__ == "__main__":
 Next you need a manifest file, which is a yaml file that tells Dagster how to invoke this script. In this case, we only need to know how to invoke the script, via a subprocess.  (The default `subprocess` target uses [Dagster Pipes](https://docs.dagster.io/guides/dagster-pipes), but this is an implementation detail.)
 
 ```yaml
+# in defs/group_a/asset_one.yaml
 target: subprocess
 ```
 
@@ -76,6 +77,7 @@ Now we want to build the asset graph and leverage it. For that we need dependenc
 Now we need to tell the system about this dependency. We do that via a manifest file which, in addition to kind, also informs the system that it has an upstream dependency on `asset_one`.
 
 ```yaml
+# in defs/group_a/asset_two.yaml
 target: subprocess
 deps:
   - group_a/asset_one
@@ -88,6 +90,7 @@ Now reload your definitions and you should see a dependency graph:
 We also want to add metadata about the underlying physical assets we are creating. By default. Nope uses [Pipes](https://docs.dagster.io/guides/dagster-pipes) which has lightweight APIs for reporting metadata events in the target script:
 
 ```python
+# in defs/group_a/asset_two.py
 from dagster_pipes import open_dagster_pipes
 
 
@@ -121,7 +124,7 @@ Sometimes scripts/computations materialize more than a single asset in a particu
 In this case we are going to simulate creating two assets, `asset_three` and `asset_four` in a single script `assets_three_and_four.py` and return metadata to Dagster using `dagster_pipes`.
 
 ```python
-# assets_three_and_four.py
+# defs/group_a/assets_three_and_four.py
 from dagster_pipes import open_dagster_pipes
 
 
@@ -139,7 +142,7 @@ Now we need to inform the system that this script materializes two assets, and t
 
 
 ```yaml
-# assets_three_and_four.yaml
+# defs/group_a/assets_three_and_four.yaml
 assets:
   asset_three:
     deps:
@@ -164,6 +167,7 @@ For example, let's imagine that we wanted to automatically set the "compute kind
 The first step is to create a custom subclass for your project.
 
 ```python
+# definitions.py
 class TutorialProject(NopeProject):
     ...
 
@@ -177,6 +181,7 @@ Nope has _invocations targets_, which correspond to an invocation of some extern
 Lastly you must make a project class that specifies how to map the `target` in each manifest file to the `NopeInvocationTarget` subtype that determines it behavior. Putting it all together:
 
 ```python
+# definitions.py
 class TutorialSubprocessInvocationTarget(NopeSubprocessInvocationTarget):
     class InvocationTargetManifest(NopeInvocationTargetManifest):
         @property
@@ -195,6 +200,7 @@ class TutorialProject(NopeProject):
 Next we want to do a similar thing at the asset level. For that we override a `NopeAssetManifest`, and in similar fashion, override a class method in our `TutorialProject` class.
 
 ```python
+# definitions.py
 class TutorialSubprocessInvocationTarget(NopeSubprocessInvocationTarget):
     # Omitting InvocationTargetManifest for brevity
     class AssetManifest(NopeAssetManifest):
@@ -218,6 +224,7 @@ For example, imagine you had an internal, pre-existing system called "Fancy" at 
 First, author the `NopeInvocationTarget` subclass:
 
 ```python
+# definitions.py
 class FancyRuntimeResource:
     def call(self, asset_keys) -> None:
         print(f"FancyRuntimeResource called on asset keys: {asset_keys}")
@@ -237,6 +244,7 @@ class FancyInvocationTarget(NopeInvocationTarget):
 And now change your project code to return that class when appropriate and include the appropriate top-level resource:
 
 ```python
+# definitions.py
 class TutorialProject(NopeProject):
     @classmethod
     def map_manifest_to_target_class(cls, target_type: str, full_manifest: dict) -> Type:
