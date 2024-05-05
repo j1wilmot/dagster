@@ -4,17 +4,17 @@ Nope is a way to structure your Dagster projects to enable medium-code orchestra
 
 ### What is medium code why does it need a platform?
 
-The term "low code" typically defines tools that have GUI interfaces for creating software programs. "Low code" implies the existence of "high code." We define high code as working in full-fledged development environment with formalized software best practices.
+The term "low code" typically defines tools that have GUI interfaces for creating software programs. "Low code" implies the existence of "high code." We define "high code" as working in full-fledged development environment with formalized software best practices.
 
 Neither of these terms is sufficient to describe a large swath of practitioners working in data. Is someone who periodically writes scripts, dbt models, or notebooks "high code" or "low code"? We submit that they are neither. 
 
-They are "medium code" developers. They write software in turing-complete languages or transformation languages such as SQL. However they are also not traditional full-time software engineers or do not want to behave as one in the data context. Data scientists, data engineers, analytics engineers often want to work this way, as do some software engineers when operating within the data platform context.
+They are "medium code" developers. They write software in Turing-complete languages or transformation languages such as SQL. However they are also not traditional full-time application developers and have different requirements. Data scientists, data engineers, analytics engineers often want to work this way, as do some software engineers when operating within the data platform context.
 
-Nope assumes that medium code engineers already have a python environment and toolchain for writing and deploying their business logic. This might be a notebooking platform, a compute environment like Ray, Modal, or Sagemaker, or a bespoke toolchain. It is a *non-goal* of Nope to improve that existing workflow.
+Nope assumes that medium-code engineers already have a Python environment and toolchain for writing and deploying their business logic. This might be a notebooking platform, a compute environment like Ray, Modal, or Sagemaker, or a bespoke toolchain. **It is a *non-goal* of Nope to improve or replace that existing workflow.**
 
 Instead the goal of Nope is to allow those users to incorporate their code into the Dagster Asset Graph without learning another Python Environment (hence the name Nope: "NO Python Environment"). The success criteria for the practitioner is straightforward: They should be able to author a yaml file which plugs their existing script/computation into the data platform without installing or interacting with an additional Python environment.
 
-Nope critically also offers a platform that a software engineer can manage for the medium code data practitioners they serve. A platform owner can customize the harness for their particular use case and technology.
+Nope also offers a platform that a software engineer can manage for the medium code data practitioners they serve. A platform owner can customize the platform for their particular use case and technology.
 
 ## Hello world asset
 
@@ -32,16 +32,17 @@ defs = NopeProject.make_definitions()
 
 This is a vanilla Dagster `Definitions` object, build with a special factory function, `NopeProject.make_definitions`.
 
-Next you need to make a `defs` folder. The first level of a `defs` folder defines group. They provide structure and organization to assets in Dagster. Assets are defined within groups.
+Next you need to make a `defs` folder. The first level of folders in `defs` define groups. They provide structure and organization to assets in Dagster. Assets are defined within groups.
 
 So in this case we make a folder `defs` and then `group_a`. Finally we make a Python that contains the business logic for the asset at `defs/group_a/asset_one.py`. In this case we just print "hello."
 
 ```python
+# in defs/group_a/asset_one.py
 if __name__ == "__main__":
     print("hello")
 ```
 
-Next you need a manifest file, which is a yaml file that tells Dagster how to invoke this script. In this case, we only need to know how to invoke the script, via a subprocess.  (The default `subprocess` target uses Dagster Pipes, but this is an implementation detail.)
+Next you need a manifest file, which is a yaml file that tells Dagster how to invoke this script. In this case, we only need to know how to invoke the script, via a subprocess.  (The default `subprocess` target uses [Dagster Pipes](https://docs.dagster.io/guides/dagster-pipes), but this is an implementation detail.)
 
 ```yaml
 target: subprocess
@@ -84,7 +85,7 @@ Now reload your definitions and you should see a dependency graph:
 
 ![Screenshot 2024-05-04 at 2 48 13 PM](https://github.com/dagster-io/dagster/assets/28738937/371ea9d3-82a4-47e5-8192-f3ddad48af84)
 
-We also want to add metadata about the underlying physical assets we are creating. For this we can use [Pipes](https://docs.dagster.io/guides/dagster-pipes) (which is the default harness for Nope out-the-box), which has lightweight APIs for reporting metadata events.
+We also want to add metadata about the underlying physical assets we are creating. By default. Nope uses [Pipes](https://docs.dagster.io/guides/dagster-pipes) which has lightweight APIs for reporting metadata events in the target script:
 
 ```python
 from dagster_pipes import open_dagster_pipes
@@ -108,7 +109,7 @@ Now we can materialize the asset and see the metadata events in the catalog.
 
 Just a few things to note:
 
-* A stakeholder can add themselves to the asset graph via a manifest without touching Python in the dagster environment.,
+* We've accomplished the state goal: A stakeholder can add themselves to the asset graph via a manifest without touching Python in the dagster environment.
 * This could easily plug into any tooling we create for the YAML DSL for typeaheads etc. DevRel/Yaml crew is already working on this so I did not replicate it.
 * Dependencies must be fully qualified (no asset key prefixes or anything) and it parses forward slashes, which is much more convenient than arrays of strings. Requiring full qualification is an explicit tradeoff for obviousness/debuggability/clarity at the expense of some additional typing when writing manifest files.
 * The asset key by default is `{group_name}/{asset_name}`
@@ -120,13 +121,14 @@ Sometimes scripts/computations materialize more than a single asset in a particu
 In this case we are going to simulate creating two assets, `asset_three` and `asset_four` in a single script `assets_three_and_four.py` and return metadata to Dagster using `dagster_pipes`.
 
 ```python
+# assets_three_and_four.py
 from dagster_pipes import open_dagster_pipes
 
 
 def main(pipes) -> None:
     pipes.log.info("Hello from asset two.")
-    pipes.report_asset_materialization(asset_key="group_a/asset_three", metadata= {"metadata": "value_one"})
-    pipes.report_asset_materialization(asset_key="group_a/asset_four", metadata= {"metadata": "value_two"})
+    pipes.report_asset_materialization(asset_key="group_a/asset_three", metadata={"metadata": "value_one"})
+    pipes.report_asset_materialization(asset_key="group_a/asset_four", metadata={"metadata": "value_two"})
 
 if __name__ == "__main__":
     with open_dagster_pipes() as pipes:
@@ -135,9 +137,9 @@ if __name__ == "__main__":
 
 Now we need to inform the system that this script materializes two assets, and that they both depend on `asset_two`. We can do this via the manifest. By using the top-level key `assets` we inform the manifest system there are multiple assets encoded in the manifest:
 
-`assets_three_and_four.yaml`:
 
 ```yaml
+# assets_three_and_four.yaml
 assets:
   asset_three:
     deps:
@@ -147,7 +149,7 @@ assets:
       - group_a/asset_two
 ```
 
-In the language of Nope, `asset_three_and_four` is single _invocation target_ that materializes two _assets_. 
+In the language of Nope, `asset_three_and_four.yaml` is the manifest for single _invocation target_. It contains manifests for two _assets_, which the script materializes on every invocation.
 
 ### Commentary
 
@@ -155,9 +157,9 @@ In the language of Nope, `asset_three_and_four` is single _invocation target_ th
 
 ## Customizing the platform metadata
 
-As a platform owner you will want to customize this for your stakeholders. Nope provide pluggability points for customizing manifests as well as invocation behavior, allowing your stakeholders to write manifest files and code in invocation target environments (e.g. scripts, notebooks, code in hosted runtimes), but allowing you to programmaticaly control the create of asset definitions.
+As a platform owner you will want to customize this for your stakeholders. Nope provide pluggability points for customizing manifests as well as invocation behavior, allowing your stakeholders to write manifest files and code in invocation target environments (e.g. scripts, notebooks, code in hosted runtimes), but allowing you to programmaticaly control the creation of asset definitions. Manifest files are the interface between the platform owner and the data practitioner.
 
-For example, let's imagine that we wanted to automatically set the "compute kind" tag to be Python for display in the asset graph and, for every asset, make the default owner "team:foobar" if manifest did not specify an owner. But we decided that an asset author is allowed to completely override the field, rather than merge. This is the platform owner making cross-cutting business logic decisions in the platform, that she wants to encode in code.
+For example, let's imagine that we wanted to automatically set the "compute kind" tag to be Python for display in the asset graph. Additional we want to make the default owner "team:foobar" if manifest did not specify an owner. But we decided that an asset author is allowed to completely override the field, rather than merge. This is the platform owner making cross-cutting business logic decisions in the platform, that they want to encode in code.
 
 The first step is to create a custom subclass for your project.
 
@@ -168,9 +170,9 @@ class TutorialProject(NopeProject):
 defs = TutorialProject.make_definitions()
 ```
 
-Nope has "invocations targets", which correspond to an invocation of some external runtime. Previously in the tutorial you specified `target: subprocess` in the manifest file, indicating the the invocation target was "subprocess". The yaml file is technically an _invocation target manifest_.
+Nope has _invocations targets_, which correspond to an invocation of some external runtime. Previously in the tutorial you specified `target: subprocess` in the manifest file, indicating the the invocation target was `subprocess`. The yaml file is technically an _invocation target manifest_.
 
-"Compute kinds" are attached to invocation targets so we have to customize the invocation target manifest. We have to create a new class that inherits from `NopeSubprocessInvocationTarget`. The purpose of this is customize the behavior of the manifest file. To do that, create an inner class named `InvocationTargetManifest` 
+"Compute kinds" are attached to invocation targets so we have to customize the invocation target manifest. We have create a new class that inherits from `NopeSubprocessInvocationTarget`. The purpose of this is customize the behavior of the manifest file. To do that, create an inner class named `InvocationTargetManifest` 
 
 Lastly you must make a project class that specifies how to map the `target` in each manifest file to the `NopeInvocationTarget` subtype that determines it behavior. Putting it all together:
 
@@ -202,12 +204,16 @@ class TutorialSubprocessInvocationTarget(NopeSubprocessInvocationTarget):
             return owners_from_manifest_file if owners_from_manifest_file else ["team:foobar"]
 ```
 
+### Commentary
+
+* These manifest file subclasses would be where we allow the platform owner to annotate in order to create a yaml schema. We omit that for now. Manifest objects have full access to the underlying objects from the yaml document and therefore could shuffle anything to the user.
+
 ## Customizing Platform Execution
 
 While the out-of-the-box invocation types (e.g. `NopeSubprocessInvocationTarget`) can get you along way, sometimes you as the platform owner want to completely customize invocation. For this case
 you 1) need to make a subclass of `NopeInvocationTarget` and then 2) modify your project to handle a new target type.
 
-For example, imagine you had an internal, pre-existing at your company that your medium code users already used. You want to invoke that programatically and do so based on the manifest files authored by users.
+For example, imagine you had an internal, pre-existing system called "Fancy" at your company that your medium-code users already happily use. You want to invoke it from Dagster and your users want to retain their existing workflow.
 
 First, author the `NopeInvocationTarget` subclass:
 
@@ -218,12 +224,13 @@ class FancyRuntimeResource:
 
 
 class FancyInvocationTarget(NopeInvocationTarget):
+    # Temporary state of affairs. We should infer from signature of invoke.
     @property
     def required_resource_keys(self) -> set:
         return {"fancy_runtime_resource"}
 
     def invoke(self, context: AssetExecutionContext, fancy_runtime_resource: FancyRuntimeResource):
-        # platform owner has complete control here
+        # Platform owner has complete control here. Can do whatever they want
         fancy_runtime_resource.call(context.selected_asset_keys)
 ```
 
