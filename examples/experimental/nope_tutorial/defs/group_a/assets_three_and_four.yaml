@@ -1,4 +1,4 @@
-kind: subprocess 
+target: subprocess 
 assets:
   asset_three:
     deps:

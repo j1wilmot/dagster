@@ -146,8 +146,8 @@ class NopeInvocationTargetManifest:
         self.asset_manifest_class = asset_manifest_class
 
     @property
-    def kind(self) -> str:
-        return self.yaml_file_as_object["kind"]
+    def target(self) -> str:
+        return self.yaml_file_as_object["target"]
 
     @property
     def asset_manifests(self) -> Sequence[NopeAssetManifest]:
