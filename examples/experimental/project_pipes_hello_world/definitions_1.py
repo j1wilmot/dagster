@@ -1,8 +1,8 @@
-from dagster._core.pipes.project import (
-    PipesProject,
+from dagster._nope.project import (
+    NopeProject,
 )
 
-defs = PipesProject.make_defs()
+defs = NopeProject.make_definitions()
 
 if __name__ == "__main__":
     defs.get_implicit_global_asset_job_def().execute_in_process()

@@ -1,16 +1,16 @@
 from typing import Dict, Type
 
-from dagster._core.pipes.project import (
-    PipesAssetManifest,
-    PipesProject,
-    PipesScriptManifest,
-    SubprocessPipesScript,
+from dagster._nope.project import (
+    NopeAssetManifest,
+    NopeExecutionTargetManifest,
+    NopeProject,
+    NopeSubprocessExecutionTarget,
 )
 
 
-# TODO: rename script to "Execution type" or something 
-class CustomPipesScript(SubprocessPipesScript):
-    class AssetManifest(PipesAssetManifest):
+# TODO: rename script to "Execution type" or something
+class CustomPipesScript(NopeSubprocessExecutionTarget):
+    class AssetManifest(NopeAssetManifest):
         @property
         def owners(self) -> list:
             owners_from_file = super().owners
@@ -18,19 +18,19 @@ class CustomPipesScript(SubprocessPipesScript):
                 return ["team:foobar"]
             return owners_from_file
 
-    class ScriptManifest(PipesScriptManifest):
+    class ExecutionTargetManifest(NopeExecutionTargetManifest):
         @property
         def tags(self) -> dict:
             return {**{"kind": "python"}, **super().tags}
 
 
-class CustomProject(PipesProject):
+class CustomProject(NopeProject):
     @classmethod
     def script_kind_map(cls) -> Dict[str, Type]:
         return {"subprocess": CustomPipesScript}
 
 
-defs = CustomProject.make_defs()
+defs = CustomProject.make_definitions()
 
 if __name__ == "__main__":
     defs.get_implicit_global_asset_job_def().execute_in_process()

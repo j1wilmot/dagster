@@ -6,13 +6,13 @@ from dagster._core.execution.context.compute import AssetExecutionContext
 from dagster._core.pipes.context import PipesExecutionResult
 from dagster._core.pipes.project import (
     PipesAssetManifest,
+    PipesExecutionTargetManifest,
     PipesScript,
-    PipesScriptManifest,
 )
 from dagster._core.pipes.subprocess import PipesSubprocessClient
 
 
-class ProjectModalKicktestScriptManifest(PipesScriptManifest):
+class ProjectModalKicktestExecutionTargetManifest(PipesExecutionTargetManifest):
     @property
     def tags(self) -> dict:
         return {
@@ -38,7 +38,7 @@ class ProjectModalKicktestScript(PipesScript):
 
     @classmethod
     def script_manifest_class(cls) -> Type:
-        return ProjectModalKicktestScriptManifest
+        return ProjectModalKicktestExecutionTargetManifest
 
 
 defs = Definitions(

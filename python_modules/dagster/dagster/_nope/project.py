@@ -3,7 +3,7 @@ import shutil
 from abc import abstractmethod
 from functools import cached_property
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Mapping, Optional, Sequence, Type
+from typing import TYPE_CHECKING, Any, Iterable, List, Mapping, Optional, Sequence, Type
 
 import yaml
 
@@ -62,7 +62,7 @@ def build_description_from_python_file(file_path: Path) -> str:
     )
 
 
-class PipesAssetManifest:
+class NopeAssetManifest:
     def __init__(
         self,
         manifest_obj,
@@ -125,7 +125,7 @@ class PipesAssetManifest:
         )
 
 
-class PipesScriptManifest:
+class NopeExecutionTargetManifest:
     file_path: Path
     asset_spec: AssetSpec
 
@@ -145,7 +145,11 @@ class PipesScriptManifest:
         self.asset_manifest_class = asset_manifest_class
 
     @property
-    def asset_manifests(self) -> Sequence[PipesAssetManifest]:
+    def kind(self) -> str:
+        return self.manifest_object["kind"]
+
+    @property
+    def asset_manifests(self) -> Sequence[NopeAssetManifest]:
         if self.manifest_object and "assets" in self.manifest_object:
             raw_asset_manifests = self.manifest_object["assets"]
             asset_manifests = []
@@ -190,12 +194,16 @@ class PipesScriptManifest:
         return {}
 
 
-class PipesScript:
-    def __init__(self, script_manifest: PipesScriptManifest):
+class NopeExecutionTarget:
+    def __init__(self, script_manifest: NopeExecutionTargetManifest):
         self._script_manifest = script_manifest
 
     @property
-    def script_manifest(self) -> PipesScriptManifest:
+    @abstractmethod
+    def required_resource_keys(self) -> set: ...
+
+    @property
+    def script_manifest(self) -> NopeExecutionTargetManifest:
         return self._script_manifest
 
     def to_assets_def(self) -> AssetsDefinition:
@@ -203,11 +211,16 @@ class PipesScript:
             specs=self.script_manifest.asset_specs,
             name=self.script_manifest.op_name,
             op_tags=self.script_manifest.tags,
+            required_resource_keys=self.required_resource_keys,
         )
-        def _pipes_asset(context: AssetExecutionContext, subprocess_client: PipesSubprocessClient):
-            return self.execute(context, subprocess_client)
+        def _nope_multi_asset(context: AssetExecutionContext):
+            import copy
 
-        return _pipes_asset
+            resource_dict = copy.copy(context.resources.original_resource_dict)
+            del resource_dict["io_manager"]
+            return self.execute(context=context, **resource_dict)
+
+        return _nope_multi_asset
 
     @cached_property
     def python_executable_path(self) -> str:
@@ -221,24 +234,14 @@ class PipesScript:
         return str(self.script_manifest.full_python_path.resolve())
 
     @abstractmethod
-    def execute(
-        self, context: AssetExecutionContext, subprocess_client: PipesSubprocessClient
-    ) -> Iterable[PipesExecutionResult]: ...
-
-    @classmethod
-    def asset_manifest_class(cls) -> Type:
-        if hasattr(cls, "AssetManifest"):
-            return getattr(cls, "AssetManifest")
-        return PipesAssetManifest
-
-    @classmethod
-    def script_manifest_class(cls) -> Type:
-        if hasattr(cls, "ScriptManifest"):
-            return getattr(cls, "ScriptManifest")
-        return PipesScriptManifest
+    def execute(self, context: AssetExecutionContext, **kwargs) -> Any: ...
 
 
-class SubprocessPipesScript(PipesScript):
+class NopeSubprocessExecutionTarget(NopeExecutionTarget):
+    @property
+    def required_resource_keys(self) -> set:
+        return {"subprocess_client"}
+
     def execute(
         self, context: AssetExecutionContext, subprocess_client: PipesSubprocessClient
     ) -> Iterable[PipesExecutionResult]:
@@ -246,38 +249,33 @@ class SubprocessPipesScript(PipesScript):
         return subprocess_client.run(context=context, command=command).get_results()
 
 
-class PipesProject:
+class NopeProject:
     @classmethod
-    def script_kind_map(cls) -> Dict[str, Type]:
-        return {
-            "subprocess": SubprocessPipesScript,
-        }
+    def create_execution_target(
+        cls, script_manifest: NopeExecutionTargetManifest
+    ) -> NopeExecutionTarget:
+        return NopeSubprocessExecutionTarget(script_manifest)
+
+    @classmethod
+    def asset_manifest_class(cls) -> Type:
+        if hasattr(cls, "AssetManifest"):
+            return getattr(cls, "AssetManifest")
+        return NopeAssetManifest
+
+    @classmethod
+    def script_manifest_class(cls) -> Type:
+        if hasattr(cls, "ExecutionTargetManifest"):
+            return getattr(cls, "ExecutionTargetManifest")
+        return NopeExecutionTargetManifest
 
     @classmethod
     def make_assets_defs(
         cls, cwd: Optional[Path] = None, root_folder: Optional[Path] = None
     ) -> Sequence[AssetsDefinition]:
-        return cls.make_pipes_project_defs(cwd, root_folder)
-
-    @classmethod
-    def make_defs(cls, resources: Optional[Mapping[str, Any]] = None) -> "Definitions":
-        from dagster._core.definitions.definitions_class import Definitions
-
-        return Definitions(
-            assets=PipesProject.make_assets_defs(),
-            resources=resources if resources else {"subprocess_client": PipesSubprocessClient()},
-        )
-
-    @classmethod
-    def make_pipes_project_defs(
-        cls,
-        cwd: Optional[Path],
-        top_level_folder: Optional[Path],
-    ) -> Sequence[AssetsDefinition]:
         cwd = cwd or Path.cwd()
-        top_level_folder = top_level_folder or Path("defs")
+        root_folder = root_folder or Path("defs")
         assets_defs = []
-        for group_folder in (cwd / top_level_folder).iterdir():
+        for group_folder in (cwd / root_folder).iterdir():
             if not group_folder.is_dir():
                 continue
 
@@ -291,7 +289,7 @@ class PipesProject:
 
             for stem_name in set(python_files) & set(yaml_files):
                 assets_defs.append(
-                    cls.make_def(
+                    cls.make_assets_def(
                         group_folder=group_folder,
                         full_python_path=python_files[stem_name],
                         full_yaml_path=yaml_files[stem_name],
@@ -301,18 +299,24 @@ class PipesProject:
         return assets_defs
 
     @classmethod
-    def make_def(
+    def make_definitions(cls, resources: Optional[Mapping[str, Any]] = None) -> "Definitions":
+        from dagster._core.definitions.definitions_class import Definitions
+
+        return Definitions(
+            assets=NopeProject.make_assets_defs(),
+            resources=resources if resources else {"subprocess_client": PipesSubprocessClient()},
+        )
+
+    @classmethod
+    def make_assets_def(
         cls, group_folder: Path, full_python_path: Path, full_yaml_path: Path
     ) -> AssetsDefinition:
-        script_manifest_obj = yaml.load(full_yaml_path.read_text(), Loader=Loader)
-        kind = script_manifest_obj["kind"]
-        script_class = cls.script_kind_map()[kind]
-        script_instance = script_class(
-            script_class.script_manifest_class()(
+        script_instance = cls.create_execution_target(
+            cls.script_manifest_class()(
                 group_folder=group_folder,
                 full_python_path=full_python_path,
                 full_manifest_path=full_yaml_path,
-                asset_manifest_class=script_class.asset_manifest_class(),
+                asset_manifest_class=cls.asset_manifest_class(),
             )
         )
         return script_instance.to_assets_def()

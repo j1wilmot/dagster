@@ -1,21 +1,21 @@
 from typing import Type
 
 from dagster import AssetExecutionContext, Definitions, PipesSubprocessClient
-from dagster._core.pipes.project import (
-    PipesAssetManifest,
-    PipesProject,
-    PipesScript,
-    PipesScriptManifest,
+from dagster._nope.project import (
+    NopeAssetManifest,
+    NopeExecutionTarget,
+    NopeExecutionTargetManifest,
+    NopeProject,
 )
 
 
-class HelloWorldProjectScriptManifest(PipesScriptManifest):
+class HelloWorldProjectExecutionTargetManifest(NopeExecutionTargetManifest):
     @property
     def tags(self) -> dict:
         return {**{"kind": "python"}, **super().tags}
 
 
-class HelloWorldProjectAssetManifest(PipesAssetManifest):
+class HelloWorldProjectAssetManifest(NopeAssetManifest):
     @property
     def owners(self) -> list:
         owners_from_file = super().owners
@@ -24,14 +24,14 @@ class HelloWorldProjectAssetManifest(PipesAssetManifest):
         return owners_from_file
 
 
-class HelloWorldProjectScript(PipesScript):
+class HelloWorldProjectScript(NopeExecutionTarget):
     @classmethod
     def asset_manifest_class(cls) -> Type:
         return HelloWorldProjectAssetManifest
 
     @classmethod
     def script_manifest_class(cls) -> Type:
-        return HelloWorldProjectScriptManifest
+        return HelloWorldProjectExecutionTargetManifest
 
     def execute(self, context: AssetExecutionContext, subprocess_client: PipesSubprocessClient):
         command = [self.python_executable_path, self.python_script_path]
@@ -39,7 +39,7 @@ class HelloWorldProjectScript(PipesScript):
 
 
 defs = Definitions(
-    assets=PipesProject.make_assets_defs(),
+    assets=NopeProject.make_assets_defs(),
     resources={"subprocess_client": PipesSubprocessClient()},
 )
 
