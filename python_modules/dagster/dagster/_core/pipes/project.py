@@ -3,10 +3,9 @@ import shutil
 from abc import abstractmethod
 from functools import cached_property
 from pathlib import Path
-from typing import Any, Iterable, List, Optional, Sequence, Type
+from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Mapping, Optional, Sequence, Type
 
 import yaml
-from typing_extensions import Self
 
 from dagster import AssetSpec, file_relative_path, multi_asset
 from dagster._core.definitions.asset_dep import CoercibleToAssetDep
@@ -20,6 +19,9 @@ try:
     from yaml import CLoader as Loader
 except ImportError:
     from yaml import Loader
+
+if TYPE_CHECKING:
+    from dagster._core.definitions.definitions_class import Definitions
 
 # Directory path
 directory = Path(file_relative_path(__file__, "assets"))
@@ -196,14 +198,6 @@ class PipesScript:
     def script_manifest(self) -> PipesScriptManifest:
         return self._script_manifest
 
-    @classmethod
-    def asset_manifest_class(cls) -> Type:
-        return PipesAssetManifest
-
-    @classmethod
-    def script_manifest_class(cls) -> Type:
-        return PipesScriptManifest
-
     def to_assets_def(self) -> AssetsDefinition:
         @multi_asset(
             specs=self.script_manifest.asset_specs,
@@ -226,32 +220,59 @@ class PipesScript:
     def python_script_path(self) -> str:
         return str(self.script_manifest.full_python_path.resolve())
 
+    @abstractmethod
+    def execute(
+        self, context: AssetExecutionContext, subprocess_client: PipesSubprocessClient
+    ) -> Iterable[PipesExecutionResult]: ...
+
     @classmethod
-    def from_file_path(
-        cls, group_folder: Path, full_python_path: Path, full_yaml_path: Optional[Path]
-    ) -> Self:
-        return cls(
-            cls.script_manifest_class()(
-                group_folder=group_folder,
-                full_python_path=full_python_path,
-                full_manifest_path=full_yaml_path,
-                asset_manifest_class=cls.asset_manifest_class(),
-            )
+    def asset_manifest_class(cls) -> Type:
+        if hasattr(cls, "AssetManifest"):
+            return getattr(cls, "AssetManifest")
+        return PipesAssetManifest
+
+    @classmethod
+    def script_manifest_class(cls) -> Type:
+        if hasattr(cls, "ScriptManifest"):
+            return getattr(cls, "ScriptManifest")
+        return PipesScriptManifest
+
+
+class SubprocessPipesScript(PipesScript):
+    def execute(
+        self, context: AssetExecutionContext, subprocess_client: PipesSubprocessClient
+    ) -> Iterable[PipesExecutionResult]:
+        command = [self.python_executable_path, self.python_script_path]
+        return subprocess_client.run(context=context, command=command).get_results()
+
+
+class PipesProject:
+    @classmethod
+    def script_kind_map(cls) -> Dict[str, Type]:
+        return {
+            "subprocess": SubprocessPipesScript,
+        }
+
+    @classmethod
+    def make_assets_defs(
+        cls, cwd: Optional[Path] = None, root_folder: Optional[Path] = None
+    ) -> Sequence[AssetsDefinition]:
+        return cls.make_pipes_project_defs(cwd, root_folder)
+
+    @classmethod
+    def make_defs(cls, resources: Optional[Mapping[str, Any]] = None) -> "Definitions":
+        from dagster._core.definitions.definitions_class import Definitions
+
+        return Definitions(
+            assets=PipesProject.make_assets_defs(),
+            resources=resources if resources else {"subprocess_client": PipesSubprocessClient()},
         )
 
     @classmethod
-    def make_def(
-        cls, group_folder: Path, full_python_path: Path, full_yaml_path: Optional[Path]
-    ) -> AssetsDefinition:
-        return cls.from_file_path(
-            group_folder=group_folder,
-            full_python_path=full_python_path,
-            full_yaml_path=full_yaml_path,
-        ).to_assets_def()
-
-    @classmethod
     def make_pipes_project_defs(
-        cls, cwd: Optional[Path] = None, top_level_folder: Optional[Path] = None
+        cls,
+        cwd: Optional[Path],
+        top_level_folder: Optional[Path],
     ) -> Sequence[AssetsDefinition]:
         cwd = cwd or Path.cwd()
         top_level_folder = top_level_folder or Path("defs")
@@ -268,22 +289,30 @@ class PipesScript:
                 elif full_path.suffix == ".py":
                     python_files[full_path.stem] = full_path
 
-            for stem_name in set(python_files):
+            for stem_name in set(python_files) & set(yaml_files):
                 assets_defs.append(
                     cls.make_def(
                         group_folder=group_folder,
                         full_python_path=python_files[stem_name],
-                        full_yaml_path=yaml_files.get(stem_name),
+                        full_yaml_path=yaml_files[stem_name],
                     )
                 )
 
         return assets_defs
 
-    @abstractmethod
-    def execute(
-        self, context: AssetExecutionContext, subprocess_client: PipesSubprocessClient
-    ) -> Iterable[PipesExecutionResult]: ...
-
     @classmethod
-    @abstractmethod
-    def build_pipes_script(cls, attrs: PipesScriptManifest) -> Self: ...
+    def make_def(
+        cls, group_folder: Path, full_python_path: Path, full_yaml_path: Path
+    ) -> AssetsDefinition:
+        script_manifest_obj = yaml.load(full_yaml_path.read_text(), Loader=Loader)
+        kind = script_manifest_obj["kind"]
+        script_class = cls.script_kind_map()[kind]
+        script_instance = script_class(
+            script_class.script_manifest_class()(
+                group_folder=group_folder,
+                full_python_path=full_python_path,
+                full_manifest_path=full_yaml_path,
+                asset_manifest_class=script_class.asset_manifest_class(),
+            )
+        )
+        return script_instance.to_assets_def()

@@ -1,7 +1,12 @@
 from typing import Type
 
 from dagster import AssetExecutionContext, Definitions, PipesSubprocessClient
-from dagster._core.pipes.project import PipesAssetManifest, PipesScript, PipesScriptManifest
+from dagster._core.pipes.project import (
+    PipesAssetManifest,
+    PipesProject,
+    PipesScript,
+    PipesScriptManifest,
+)
 
 
 class HelloWorldProjectScriptManifest(PipesScriptManifest):
@@ -34,6 +39,10 @@ class HelloWorldProjectScript(PipesScript):
 
 
 defs = Definitions(
-    assets=HelloWorldProjectScript.make_pipes_project_defs(),
+    assets=PipesProject.make_assets_defs(),
     resources={"subprocess_client": PipesSubprocessClient()},
 )
+
+
+if __name__ == "__main__":
+    defs.get_implicit_global_asset_job_def().execute_in_process()

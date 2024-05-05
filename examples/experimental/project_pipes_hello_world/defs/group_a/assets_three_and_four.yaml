@@ -1,3 +1,4 @@
+kind: subprocess 
 assets:
   asset_three:
     deps:

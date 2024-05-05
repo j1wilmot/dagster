@@ -1,47 +1,42 @@
-# Pipes Projects™
+# Pipes Projects: Low-code orchestration in dagster. 
 
-Pipes projects is a way to structure your Dagster projects if you want to execute external scripts with Dagster Pipes. It has an opinionated file layout scheme. The explicit goal of this approach is to allow for contributors to add and contribute to python-based assets in Dagster without interact with the core `dagster` library or program against it. They shouldn't even need to have a python environment that includes it if they rely on branch deployments.
+Pipes projects is a way to structure your Dagster projects to enable low-code orchestration of external scripts and computations. It has an opinionated file layout scheme. This approach has a few goals:
+
+* Create and modify the asset graph structure without modifying Python 
+* Allow contributors to orchestrate Python scripts that materialize assets in the Asset Graph without having to import and learn the core `dagster` programming model. They can write vanilla scripts, or use Pipes to opt into argument passing and metadata logging features. 
+* They shouldn't even need to have a python environment that includes it if they rely on branch deployments.
 
 ## Hello world asset
 
 To get started you'll need to create a `definitions.py` file and a `defs` folder. 
 
-* `definitions.py` is the file that actually creates a `Definitions` object. This is file is typically managed by the owner of the data platform and someone who interacts and knows Dagster well. 
+* `definitions.py` is the file that actually creates a `Definitions` object. 
 * `defs` is the folder that contains all the business logic for your assets. The code in `definitions.py` introspects `defs` to build the asset graph.
 
 `definitions.py`:
 ```python 
-from dagster import AssetExecutionContext, Definitions, PipesSubprocessClient
-from dagster._core.pipes.project import PipesScript
-
-
-class HelloWorldProjectScript(PipesScript):
-    def execute(self, context: AssetExecutionContext, subprocess_client: PipesSubprocessClient):
-        command = [self.python_executable_path, self.python_script_path]
-        return subprocess_client.run(context=context, command=command).get_results()
-
-
-defs = Definitions(
-    assets=HelloWorldProjectScript.make_pipes_project_defs(),
-    resources={"subprocess_client": PipesSubprocessClient()},
+from dagster._core.pipes.project import (
+    PipesProject,
 )
+
+defs = PipesProject.make_defs()
 ```
 
-This is a vanilla Dagster `Definitions` object, build with a special factory function, `make_pipes_project_defs`.
+This is a vanilla Dagster `Definitions` object, build with a special factory function, `PipesProject.make_defs`.
 
 Next you need to make a `defs` folder. The first level of a `defs` folder defines the groups in a code location. Assets are defined within groups.
 
-So in this case we make a folder `defs` and then `group_a`. Finally we make a Python that contains the business logic for the asset at `defs/group_a/asset_one.py`.
+So in this case we make a folder `defs` and then `group_a`. Finally we make a Python that contains the business logic for the asset at `defs/group_a/asset_one.py`. In this case we just print "hello."
 
 ```python
-from dagster_pipes import open_dagster_pipes
-
-def main(pipes) -> None:
-    pipes.log.info("Hello")
-
 if __name__ == "__main__":
-    with open_dagster_pipes() as pipes:
-        main(pipes)
+    print("hello")
+```
+
+Next you need a manifest file, which is a yaml file that tells Dagster how to invoke this script. In this case, we only need to know how to invoke the script, via a subprocess. (Note: thie uses the `PipesSubprocessClient` underneath the hood.)
+
+```yaml
+kind: subprocess
 ```
 
 With these two files in place we can load them in Dagster UI with `dagster dev -f definitions.py`.
@@ -64,28 +59,15 @@ During this README I'm going to interrrupt it with commentary to note decisions 
     * Want make groups "heavier" here and make them a function of filesystem layout. The "default" group would have confused that mental model considerably, so I just made it impossible to create an asset without a group. We could find lighterweight solutions here, but I think the outcome is pretty reasonable.
     * By default, this system incorporates group name into the asset key. In general Project Pipes 1) will never introduce the concept of asset prefix 2) will assume that groups are just incorporate into the asset key and 3) let the user opt into explicit asset key management if they want to do so.
 * Forcing a file-per-script gets us a bunch of a stuff for free. Two of them are right up front: rendering the python code in the UI and usage of the code versioning system.
-* We have also just written an asset factory (`HelloWorldProjectScript` serves that purpose here) without dynamically generating decorated functions. I think the ergonomics are much better here.
 
 ## Building the graph
 
-Now we want to build an asset graph. For that we need dependencies. First let's create a second asset file `asset_two.py`:
+Now we want to build the asset graph and leverage it. For that we need dependencies. First let's create a second asset file `asset_two.py`:
 
-```python
-from dagster_pipes import open_dagster_pipes
-
-
-def main(pipes) -> None:
-    pipes.log.info("Hello from asset two.")
-
-
-if __name__ == "__main__":
-    with open_dagster_pipes() as pipes:
-        main(pipes)
-```
-
-Now we need to tell the system about this dependency. We do that via a `manifest file`, which is a yaml file with the same name as the script in the same group folder.
+Now we need to tell the system about this dependency. We do that via a manifest file which, in addition to kind, also informs the system that it has an upstream dependency on `asset_one`.
 
 ```yaml
+kind: subprocess
 deps:
   - group_a/asset_one
 ```
@@ -94,29 +76,47 @@ Now reload your definitions and you should see a dependency graph:
 
 ![Screenshot 2024-05-04 at 2 48 13 PM](https://github.com/dagster-io/dagster/assets/28738937/371ea9d3-82a4-47e5-8192-f3ddad48af84)
 
-You can also add tags, metadata, and other attributes via the manifest.
+We also want to add metadata about the underlying physical assets we are creating. For this we can use Pipes, which has lightweight APIs for reporting metadata events.
+
+```python
+from dagster_pipes import open_dagster_pipes
+
+
+def main(pipes) -> None:
+    pipes.log.info("Hello from asset two.")
+    pipes.report_asset_materialization(metadata={"metadata": "value_one"})
+
+
+if __name__ == "__main__":
+    with open_dagster_pipes() as pipes:
+        main(pipes)
+```
+
+Now we can materialize the asset and see the metadata events in the catalog.
+
+TODO: insert image
 
 ### Commentary on graph construction
 
 Just a few things to note:
 
-* A stakeholder can add themselves to the asset graph via a manifest without touching Python.
+* A stakeholder can add themselves to the asset graph via a manifest without touching Python in the dagster environment.,
 * This could easily plug into any tooling we create for the YAML DSL for typeaheads etc.
 * Dependencies must be fully qualified (no asset key prefixes or anything) and it parses forward slashes, which is much more convenient than arrays of strings.
 * The asset key by default is `{group_name}/{asset_name}`
 
-## Customizing script and asset creation
+## Customizing the low-code platform 
 
-As a data engineer you will want to customize this for your stakeholders. Pipes Projects provide pluggability points to do that easily, allowing your stakeholders to write standalone python scripts and yaml only, but allowing you to programmaticaly control the create of asset definitions.
+As a data engineer you will want to customize this for your stakeholders. Pipes Projects provide pluggability points to do that easily, allowing your stakeholders to write manifest files and code in external execution environments (e.g. scripts, notebooks, code in hosted runtimes), but allowing you to programmaticaly control the create of asset definitions.
 
-For example, let's imagine that we wanted to automatically set the "kind" tag to be Python and, for every asset, make the default owner "team:foobar" if manifest did not specify an owner. But we decided that an asset author is allowed to completely override the field, rather than merge.
+For example, let's imagine that we wanted to automatically set the "compute kind" tag to be Python for display in the asset graph and, for every asset, make the default owner "team:foobar" if manifest did not specify an owner. But we decided that an asset author is allowed to completely override the field, rather than merge.
 
-"Kinds" are attached to scripts, not assets. We have to create a new class that inherits from `PipesScriptManifest` and customize the tags behavior:
+"Compute kinds" are attached to scripts, not assets. We have to create a new class that inherits from `PipesScriptManifest` and customize the tags behavior:
 
 ```python
 class HelloWorldProjectScriptManifest(PipesScriptManifest):
     @property
-    def tags(self) -> dict:
+ig   def tags(self) -> dict:
         # makes the kind tag "python" if it doesn't exist. User can override with their
         # own kind tag in the manifest
         return {**{"kind": "python"}, **super().tags}
