@@ -1,10 +1,16 @@
-# Pipes Projects: Low-code orchestration in dagster. 
+# Nope: Medium-code orchestration platform
 
-Pipes projects is a way to structure your Dagster projects to enable low-code orchestration of external scripts and computations. It has an opinionated file layout scheme. This approach has a few goals:
+Nope is a way to structure your Dagster projects to enable medium-code orchestration of external scripts and computations. 
 
-* Create and modify the asset graph structure without modifying Python 
-* Allow contributors to orchestrate Python scripts that materialize assets in the Asset Graph without having to import and learn the core `dagster` programming model. They can write vanilla scripts, or use Pipes to opt into argument passing and metadata logging features. 
-* They shouldn't even need to have a python environment that includes it if they rely on branch deployments.
+### What is medium code why does it need a platform?
+
+The term "low code" typically defines tools that have GUI interfaces for creating software programs. "Low code" implies the existence of "high code." We define high code as working in full fledged development environment with formalized software best practices.
+
+Neither of these terms is sufficient to describe a large swath of practitioner working in data. Is someone who writes scripts, dbt models, or notebooks "high code" or "low code"? We submit that they are neither. They are "medium code" developments. They write software in turing-complete languages or transformation languages such as SQL. However they are also not traditional full-time software engineers or do not want to behavior as one in the data context. Data scientists, data engineers, analytics engineers often want to work this way, as do software engineers operating within the data platform.
+
+Nope assumes that medium code engineers already have a python environment and toolchain for writing and deploying their business logic. This might be a notebooking platform, a compute environment like Ray or Modal, or a bespoke process at a company. It is a *non-goal* of Nope to improve that existing workflow. Instead the goal of Nope is to allow those users to incorporate their transforms into the Dagster Asset Graph without learning another Python Environment (hence the name Nope: "NO Python Environment"). They should be able to author a manifest file which plugs their existing script/computation into the data platform. 
+
+Nope critically also offers a platform that a software engineer can manage for the medium code data practitioners they serve. A platform owner can customize the harness for their particular use case and technology.
 
 ## Hello world asset
 
@@ -15,14 +21,12 @@ To get started you'll need to create a `definitions.py` file and a `defs` folder
 
 `definitions.py`:
 ```python 
-from dagster._core.pipes.project import (
-    PipesProject,
-)
+from dagster._nope import NopeProject
 
-defs = PipesProject.make_defs()
+defs = NopeProject.make_definitions()
 ```
 
-This is a vanilla Dagster `Definitions` object, build with a special factory function, `PipesProject.make_defs`.
+This is a vanilla Dagster `Definitions` object, build with a special factory function, `NopeProject.make_definitions`.
 
 Next you need to make a `defs` folder. The first level of a `defs` folder defines the groups in a code location. Assets are defined within groups.
 
@@ -33,17 +37,17 @@ if __name__ == "__main__":
     print("hello")
 ```
 
-Next you need a manifest file, which is a yaml file that tells Dagster how to invoke this script. In this case, we only need to know how to invoke the script, via a subprocess. (Note: thie uses the `PipesSubprocessClient` underneath the hood.)
+Next you need a manifest file, which is a yaml file that tells Dagster how to invoke this script. In this case, we only need to know how to invoke the script, via a subprocess.  (The default `subprocess` target uses Dagster Pipes, but this is an implementation detail.)
 
 ```yaml
-kind: subprocess
+target: subprocess
 ```
 
 With these two files in place we can load them in Dagster UI with `dagster dev -f definitions.py`.
 
 ![Screenshot 2024-05-04 at 2 23 04 PM](https://github.com/dagster-io/dagster/assets/28738937/6244402d-35ca-41fa-bcdc-a81dcac56876)
 
-Note that the folder you made, `group_a`, corresponds to a group in the left nav. Similarly the file you created `asset_one.py`, creates an asset called `asset_one`. If you click on the asset, more information appears:
+Note that the folder you made, `group_a`, corresponds to a group in the left nav. Similarly the file you created `asset_one.py`, creates an asset called `asset_one`. (Note: For dagster veterans the asset key of this asset is `group_a/asset_one` as well.) If you click on the asset, more information appears:
 
 ![Screenshot 2024-05-04 at 2 24 36 PM](https://github.com/dagster-io/dagster/assets/28738937/9a01adaf-df4d-4bcc-9c8f-0c07c24d3c06)
 
@@ -56,8 +60,8 @@ Next you can click on asset and materialize it. You are off to the races!
 During this README I'm going to interrrupt it with commentary to note decisions made for users.
 
 * We are heavily opting the user into groups here. There a couple reasons here.
-    * Want make groups "heavier" here and make them a function of filesystem layout. The "default" group would have confused that mental model considerably, so I just made it impossible to create an asset without a group. We could find lighterweight solutions here, but I think the outcome is pretty reasonable.
-    * By default, this system incorporates group name into the asset key. In general Project Pipes 1) will never introduce the concept of asset prefix 2) will assume that groups are just incorporate into the asset key and 3) let the user opt into explicit asset key management if they want to do so.
+    * This make groups "heavier" here and make them a function of filesystem layout. The "default" group would have confused that mental model considerably, so I just made it impossible to create an asset without a group. We could find lighterweight solutions here, but I think the outcome is pretty reasonable.
+    * By default, this system incorporates group name into the asset key. In general Nope 1) will never introduce the concept of asset prefix 2) will assume that groups are just incorporated into the asset key and 3) let the user opt into explicit asset key management if they want to do so.
 * Forcing a file-per-script gets us a bunch of a stuff for free. Two of them are right up front: rendering the python code in the UI and usage of the code versioning system.
 
 ## Building the graph
@@ -76,7 +80,7 @@ Now reload your definitions and you should see a dependency graph:
 
 ![Screenshot 2024-05-04 at 2 48 13 PM](https://github.com/dagster-io/dagster/assets/28738937/371ea9d3-82a4-47e5-8192-f3ddad48af84)
 
-We also want to add metadata about the underlying physical assets we are creating. For this we can use Pipes, which has lightweight APIs for reporting metadata events.
+We also want to add metadata about the underlying physical assets we are creating. For this we can use Pipes (which is the default harness for Nope out-the-box), which has lightweight APIs for reporting metadata events.
 
 ```python
 from dagster_pipes import open_dagster_pipes
@@ -101,13 +105,13 @@ TODO: insert image
 Just a few things to note:
 
 * A stakeholder can add themselves to the asset graph via a manifest without touching Python in the dagster environment.,
-* This could easily plug into any tooling we create for the YAML DSL for typeaheads etc.
-* Dependencies must be fully qualified (no asset key prefixes or anything) and it parses forward slashes, which is much more convenient than arrays of strings.
+* This could easily plug into any tooling we create for the YAML DSL for typeaheads etc. Pete/DevRel is already working on this so I did not replicate it.
+* Dependencies must be fully qualified (no asset key prefixes or anything) and it parses forward slashes, which is much more convenient than arrays of strings. Requiring full qualification is an explicit tradeoff for obviousness/debuggability/clarity at the expense of some additional typing when writing manifest files.
 * The asset key by default is `{group_name}/{asset_name}`
 
-## Customizing the low-code platform 
+## Customizing the platform 
 
-As a data engineer you will want to customize this for your stakeholders. Pipes Projects provide pluggability points to do that easily, allowing your stakeholders to write manifest files and code in external execution environments (e.g. scripts, notebooks, code in hosted runtimes), but allowing you to programmaticaly control the create of asset definitions.
+As a platform owner you will want to customize this for your stakeholders. Pipes Projects provide pluggability points to do that easily, allowing your stakeholders to write manifest files and code in external execution environments (e.g. scripts, notebooks, code in hosted runtimes), but allowing you to programmaticaly control the create of asset definitions.
 
 For example, let's imagine that we wanted to automatically set the "compute kind" tag to be Python for display in the asset graph and, for every asset, make the default owner "team:foobar" if manifest did not specify an owner. But we decided that an asset author is allowed to completely override the field, rather than merge.
 

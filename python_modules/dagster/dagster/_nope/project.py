@@ -7,7 +7,12 @@ from typing import TYPE_CHECKING, Any, Iterable, List, Mapping, Optional, Sequen
 
 import yaml
 
-from dagster import AssetSpec, file_relative_path, multi_asset
+from dagster import (
+    AssetSpec,
+    _check as check,
+    file_relative_path,
+    multi_asset,
+)
 from dagster._core.definitions.asset_dep import CoercibleToAssetDep
 from dagster._core.definitions.asset_key import AssetKey, CoercibleToAssetKey
 from dagster._core.definitions.assets import AssetsDefinition
@@ -15,6 +20,7 @@ from dagster._core.execution.context.compute import AssetExecutionContext
 from dagster._core.pipes.context import PipesExecutionResult
 from dagster._core.pipes.subprocess import PipesSubprocessClient
 from dagster._core.storage.io_manager import IOManager
+from dagster._seven import is_subclass
 
 try:
     from yaml import CLoader as Loader
@@ -264,20 +270,31 @@ class NoopIOManager(IOManager):
 class NopeProject:
     @classmethod
     def create_invocation_target(
-        cls, script_manifest: NopeInvocationTargetManifest
+        cls, target_manifest: NopeInvocationTargetManifest
     ) -> NopeInvocationTarget:
-        return NopeSubprocessInvocationTarget(script_manifest)
+        return NopeSubprocessInvocationTarget(target_manifest)
 
     @classmethod
     def asset_manifest_class(cls) -> Type:
         if hasattr(cls, "AssetManifest"):
-            return getattr(cls, "AssetManifest")
+            manifest_cls = getattr(cls, "AssetManifest")
+            check.invariant(
+                is_subclass(manifest_cls, NopeAssetManifest),
+                "User-defined AssetManifest class must subclass NopeAssetManifest",
+            )
+            return manifest_cls
+
         return NopeAssetManifest
 
     @classmethod
     def script_manifest_class(cls) -> Type:
-        if hasattr(cls, "ExecutionTargetManifest"):
-            return getattr(cls, "ExecutionTargetManifest")
+        if hasattr(cls, "InvocationTargetManifest"):
+            invocation_target_manifest = getattr(cls, "InvocationTargetManifest")
+            check.invariant(
+                is_subclass(invocation_target_manifest, NopeInvocationTargetManifest),
+                "User-defined InvocationTargetManifest class must subclass NopeInvocationTargetManifest",
+            )
+            return invocation_target_manifest
         return NopeInvocationTargetManifest
 
     @classmethod
@@ -319,10 +336,10 @@ class NopeProject:
         # need to create
 
         return Definitions(
-            assets=NopeProject.make_assets_defs(),
+            assets=cls.make_assets_defs(),
             resources={
-                **{"io_manager": NoopIOManager()}, # Nope doesn't support IO managers
-                **(resources or {"subprocess_client": PipesSubprocessClient()}), 
+                **{"io_manager": NoopIOManager()},  # Nope doesn't support IO managers
+                **(resources or {"subprocess_client": PipesSubprocessClient()}),
             },
         )
 
