@@ -246,6 +246,29 @@ class NopeInvocationTarget:
     @abstractmethod
     def invoke(self, context: AssetExecutionContext, **kwargs) -> Any: ...
 
+    @classmethod
+    def asset_manifest_class(cls) -> Type:
+        if hasattr(cls, "AssetManifest"):
+            manifest_cls = getattr(cls, "AssetManifest")
+            check.invariant(
+                is_subclass(manifest_cls, NopeAssetManifest),
+                "User-defined AssetManifest class must subclass NopeAssetManifest",
+            )
+            return manifest_cls
+
+        return NopeAssetManifest
+
+    @classmethod
+    def script_manifest_class(cls) -> Type:
+        if hasattr(cls, "InvocationTargetManifest"):
+            invocation_target_manifest = getattr(cls, "InvocationTargetManifest")
+            check.invariant(
+                is_subclass(invocation_target_manifest, NopeInvocationTargetManifest),
+                "User-defined InvocationTargetManifest class must subclass NopeInvocationTargetManifest",
+            )
+            return invocation_target_manifest
+        return NopeInvocationTargetManifest
+
 
 class NopeSubprocessInvocationTarget(NopeInvocationTarget):
     @property
@@ -269,33 +292,10 @@ class NoopIOManager(IOManager):
 
 class NopeProject:
     @classmethod
-    def create_invocation_target(
-        cls, target_manifest: NopeInvocationTargetManifest
-    ) -> NopeInvocationTarget:
-        return NopeSubprocessInvocationTarget(target_manifest)
-
-    @classmethod
-    def asset_manifest_class(cls) -> Type:
-        if hasattr(cls, "AssetManifest"):
-            manifest_cls = getattr(cls, "AssetManifest")
-            check.invariant(
-                is_subclass(manifest_cls, NopeAssetManifest),
-                "User-defined AssetManifest class must subclass NopeAssetManifest",
-            )
-            return manifest_cls
-
-        return NopeAssetManifest
-
-    @classmethod
-    def script_manifest_class(cls) -> Type:
-        if hasattr(cls, "InvocationTargetManifest"):
-            invocation_target_manifest = getattr(cls, "InvocationTargetManifest")
-            check.invariant(
-                is_subclass(invocation_target_manifest, NopeInvocationTargetManifest),
-                "User-defined InvocationTargetManifest class must subclass NopeInvocationTargetManifest",
-            )
-            return invocation_target_manifest
-        return NopeInvocationTargetManifest
+    def map_manifest_to_target_class(cls, target_type: str, full_manifest: dict) -> Type:
+        if target_type == "subprocess":
+            return NopeSubprocessInvocationTarget
+        raise NotImplementedError(f"Target type {target_type} not supported by {cls.__name__}")
 
     @classmethod
     def make_assets_defs(
@@ -347,12 +347,22 @@ class NopeProject:
     def make_assets_def(
         cls, group_folder: Path, full_python_path: Path, full_yaml_path: Path
     ) -> AssetsDefinition:
-        script_instance = cls.create_invocation_target(
-            cls.script_manifest_class()(
+        full_manifest = yaml.load(full_yaml_path.read_text(), Loader=Loader)
+        check.invariant(
+            full_manifest and "target" in full_manifest,
+            f"Invalid manifest file {full_yaml_path}. Must have top-level target key",
+        )
+
+        target_cls = cls.map_manifest_to_target_class(
+            target_type=full_manifest["target"], full_manifest=full_manifest
+        )
+
+        script_instance = target_cls(
+            target_cls.script_manifest_class()(
                 group_folder=group_folder,
                 full_python_path=full_python_path,
                 full_manifest_path=full_yaml_path,
-                asset_manifest_class=cls.asset_manifest_class(),
+                asset_manifest_class=target_cls.asset_manifest_class(),
             )
         )
         return script_instance.to_assets_def()

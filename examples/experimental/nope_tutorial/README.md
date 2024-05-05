@@ -170,31 +170,84 @@ defs = TutorialProject.make_definitions()
 
 Nope has "invocations targets", which correspond to an invocation of some external runtime. Previously in the tutorial you specified `target: subprocess` in the manifest file, indicating the the invocation target was "subprocess". The yaml file is technically an _invocation target manifest_.
 
-"Compute kinds" are attached to invocation targets so we have to customize the invocation target manifest. We have to create a new class that inherits from `NopeInvocationTargetManifest` and customize the tags behavior. Thie class must be named `InvocationTargetManifest` and be within your custom project class.
+"Compute kinds" are attached to invocation targets so we have to customize the invocation target manifest. We have to create a new class that inherits from `NopeSubprocessInvocationTarget`. The purpose of this is customize the behavior of the manifest file. To do that, create an inner class named `InvocationTargetManifest` 
+
+Lastly you must make a project class that specifies how to map the `target` in each manifest file to the `NopeInvocationTarget` subtype that determines it behavior. Putting it all together:
 
 ```python
-class TutorialProject(NopeProject):
+class TutorialSubprocessInvocationTarget(NopeSubprocessInvocationTarget):
     class InvocationTargetManifest(NopeInvocationTargetManifest):
         @property
         def tags(self) -> dict:
             return {**{"kind": "python"}, **super().tags}
+
+class TutorialProject(NopeProject):
+    @classmethod
+    def map_manifest_to_target_class(cls, target_type: str, full_manifest: dict) -> Type:
+        if target_type == "subprocess":
+            return TutorialSubprocessInvocationTarget
+
+        raise Exception(f"Target type {target_type} not supported by {cls.__name__}")
 ```
 
 Next we want to do a similar thing at the asset level. For that we override a `NopeAssetManifest`, and in similar fashion, override a class method in our `TutorialProject` class.
 
 ```python
-class TutorialProject(NopeProject):
+class TutorialSubprocessInvocationTarget(NopeSubprocessInvocationTarget):
+    # Omitting InvocationTargetManifest for brevity
     class AssetManifest(NopeAssetManifest):
         @property
         def owners(self) -> list:
             owners_from_manifest_file = super().owners
             return owners_from_manifest_file if owners_from_manifest_file else ["team:foobar"]
-    ...
 ```
 
 ## Customizing Platform Execution
 
-TODO
+While the out-of-the-box invocation types (e.g. `NopeSubprocessInvocationTarget`) can get you along way, sometimes you as the platform owner want to completely customize invocation. For this case
+you 1) need to make a subclass of `NopeInvocationTarget` and then 2) modify your project to handle a new target type.
+
+For example, imagine you had an internal, pre-existing at your company that your medium code users already used. You want to invoke that programatically and do so based on the manifest files authored by users.
+
+First, author the `NopeInvocationTarget` subclass:
+
+```python
+class FancyRuntimeResource:
+    def call(self, asset_keys) -> None:
+        print(f"FancyRuntimeResource called on asset keys: {asset_keys}")
+
+
+class FancyInvocationTarget(NopeInvocationTarget):
+    @property
+    def required_resource_keys(self) -> set:
+        return {"fancy_runtime_resource"}
+
+    def invoke(self, context: AssetExecutionContext, fancy_runtime_resource: FancyRuntimeResource):
+        # platform owner has complete control here
+        fancy_runtime_resource.call(context.selected_asset_keys)
+```
+
+And now change your project code to return that class when appropriate and include the appropriate top-level resource:
+
+```python
+class TutorialProject(NopeProject):
+    @classmethod
+    def map_manifest_to_target_class(cls, target_type: str, full_manifest: dict) -> Type:
+        if target_type == "fancy":
+            return FancyInvocationTarget
+        elif target_type == "subprocess":
+            return TutorialSubprocessInvocationTarget
+
+        raise Exception(f"Target type {target_type} not supported by {cls.__name__}")
+
+
+defs = TutorialProject.make_definitions(
+    resources={
+        "fancy_runtime_resource": FancyRuntimeResource(),
+        "subprocess_client": PipesSubprocessClient(),
+    }
+)
+```
 
 ## Future work
 
