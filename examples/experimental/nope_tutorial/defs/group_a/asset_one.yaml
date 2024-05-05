@@ -1,1 +1,2 @@
 target: subprocess
+script: defs/group_a/asset_one.py

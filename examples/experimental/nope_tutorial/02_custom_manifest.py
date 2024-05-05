@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Type
 
 from dagster._core.execution.context.compute import AssetExecutionContext
@@ -51,10 +52,11 @@ class TutorialProject(NopeProject):
 
 
 defs = TutorialProject.make_definitions(
+    defs_path=Path(__file__).resolve().parent / Path("defs"),
     resources={
         "fancy_runtime_resource": FancyRuntimeResource(),
         "subprocess_client": PipesSubprocessClient(),
-    }
+    },
 )
 
 if __name__ == "__main__":

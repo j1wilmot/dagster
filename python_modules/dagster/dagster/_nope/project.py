@@ -3,7 +3,7 @@ import shutil
 from abc import abstractmethod
 from functools import cached_property
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Iterable, List, Mapping, Optional, Sequence, Type
+from typing import TYPE_CHECKING, Any, Iterable, List, Mapping, Optional, Sequence, Type, Union
 
 import yaml
 
@@ -72,14 +72,15 @@ def build_description_from_python_file(file_path: Path) -> str:
 class NopeAssetManifest:
     def __init__(
         self,
+        *,
         asset_manifest_obj,
         full_python_path: Path,
-        group_folder: Path,
+        group_name: str,
         asset_key_parts: List[str],
     ) -> None:
         self.asset_manifest_obj = asset_manifest_obj or {}
         self.full_python_path = full_python_path
-        self.group_folder = group_folder
+        self._group_name = group_name
         self.asset_key_parts = asset_key_parts
 
     @property
@@ -104,7 +105,7 @@ class NopeAssetManifest:
 
     @property
     def group_name(self) -> str:
-        return self.group_folder.name
+        return self._group_name
 
     @property
     def tags(self) -> dict:
@@ -139,12 +140,12 @@ class NopeInvocationTargetManifest:
     def __init__(
         self,
         *,
-        group_folder: Path,
+        group_name: str,
         full_python_path: Path,
         full_manifest_path: Optional[Path],
         asset_manifest_class: Type,
     ) -> None:
-        self.group_folder = group_folder
+        self._group_name = group_name
         self.full_python_path = full_python_path
         self.yaml_file_as_object = (
             yaml.load(full_manifest_path.read_text(), Loader=Loader) if full_manifest_path else {}
@@ -165,7 +166,7 @@ class NopeInvocationTargetManifest:
                     self.asset_manifest_class(
                         asset_manifest_obj=raw_asset_manifest,
                         full_python_path=self.full_python_path,
-                        group_folder=self.group_folder,
+                        group_name=self._group_name,
                         asset_key_parts=asset_name.split("."),
                     )
                 )
@@ -173,9 +174,9 @@ class NopeInvocationTargetManifest:
         else:
             return [
                 self.asset_manifest_class(
-                    self.yaml_file_as_object,
-                    self.full_python_path,
-                    self.group_folder,
+                    asset_manifest_obj=self.yaml_file_as_object,
+                    full_python_path=self.full_python_path,
+                    group_name=self._group_name,
                     asset_key_parts=self.full_python_path.stem.split("."),
                 )
             ]
@@ -259,7 +260,7 @@ class NopeInvocationTarget:
         return NopeAssetManifest
 
     @classmethod
-    def script_manifest_class(cls) -> Type:
+    def invocation_target_manifest_class(cls) -> Type:
         if hasattr(cls, "InvocationTargetManifest"):
             invocation_target_manifest = getattr(cls, "InvocationTargetManifest")
             check.invariant(
@@ -298,19 +299,15 @@ class NopeProject:
         raise NotImplementedError(f"Target type {target_type} not supported by {cls.__name__}")
 
     @classmethod
-    def make_assets_defs(
-        cls, cwd: Optional[Path] = None, root_folder: Optional[Path] = None
-    ) -> Sequence[AssetsDefinition]:
-        cwd = cwd or Path.cwd()
-        root_folder = root_folder or Path("defs")
+    def make_assets_defs(cls, defs_path: Path) -> Sequence[AssetsDefinition]:
         assets_defs = []
-        for group_folder in (cwd / root_folder).iterdir():
+        for group_folder in defs_path.iterdir():
             if not group_folder.is_dir():
                 continue
 
             yaml_files = {}
             python_files = {}
-            for full_path in (cwd / group_folder).iterdir():
+            for full_path in group_folder.iterdir():
                 if full_path.suffix == ".yaml":
                     yaml_files[full_path.stem] = full_path
                 elif full_path.suffix == ".py":
@@ -319,7 +316,7 @@ class NopeProject:
             for stem_name in set(python_files) & set(yaml_files):
                 assets_defs.append(
                     cls.make_assets_def(
-                        group_folder=group_folder,
+                        group_name=group_folder.name,
                         full_python_path=python_files[stem_name],
                         full_yaml_path=yaml_files[stem_name],
                     )
@@ -328,7 +325,9 @@ class NopeProject:
         return assets_defs
 
     @classmethod
-    def make_definitions(cls, resources: Optional[Mapping[str, Any]] = None) -> "Definitions":
+    def make_definitions(
+        cls, defs_path: Union[str, Path], resources: Optional[Mapping[str, Any]] = None
+    ) -> "Definitions":
         from dagster._core.definitions.definitions_class import Definitions
 
         # TODO. When we add support for more default invocation targtes, make
@@ -336,7 +335,9 @@ class NopeProject:
         # need to create
 
         return Definitions(
-            assets=cls.make_assets_defs(),
+            assets=cls.make_assets_defs(
+                defs_path=defs_path if isinstance(defs_path, Path) else Path(defs_path)
+            ),
             resources={
                 **{"io_manager": NoopIOManager()},  # Nope doesn't support IO managers
                 **(resources or {"subprocess_client": PipesSubprocessClient()}),
@@ -345,7 +346,7 @@ class NopeProject:
 
     @classmethod
     def make_assets_def(
-        cls, group_folder: Path, full_python_path: Path, full_yaml_path: Path
+        cls, group_name: str, full_python_path: Path, full_yaml_path: Path
     ) -> AssetsDefinition:
         full_manifest = yaml.load(full_yaml_path.read_text(), Loader=Loader)
         check.invariant(
@@ -358,8 +359,8 @@ class NopeProject:
         )
 
         script_instance = target_cls(
-            target_cls.script_manifest_class()(
-                group_folder=group_folder,
+            target_cls.invocation_target_manifest_class()(
+                group_name=group_name,
                 full_python_path=full_python_path,
                 full_manifest_path=full_yaml_path,
                 asset_manifest_class=target_cls.asset_manifest_class(),
