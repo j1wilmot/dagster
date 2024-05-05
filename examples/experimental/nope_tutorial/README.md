@@ -269,6 +269,121 @@ defs = TutorialProject.make_definitions(
 )
 ```
 
+## A more realistic example of platform customization
+
+To see the power of this let's run a scenarion where we wanted to onboard our stakeholders onto [Modal](https://modal.com/). Modal makes it very easy to run arbitrary python in the cloud.
+
+For example. You can write this file:
+
+```python
+# defs/group_one/modal_asset_one.py
+import modal
+
+app = modal.App("schrockn-project-pipes-kicktest")
+
+
+@app.function()
+def asset_one_on_modal() -> None:
+    print("This print statement is running on modal's cloud.")
+
+
+@app.local_entrypoint()
+def main() -> None:
+    asset_one_on_modal.remote()
+```
+
+And run it with `modal run defs/group_one/modal_asset_one.py` and it automatically uploads (and containerizes it using their incredibly fast runtime) it and runs it very smoothly. Your stakeholders are very happy with this workflow, but you want them to work within the Dagster asset graph. Additionally, the developers have been stomping eachother's work recently since they were not using modal's [environments](https://modal.com/docs/reference/cli/environment) feature. 
+
+Dagster's branch deployments make a lot of sense to you and you want to extend that to local development using Modal. You decide to use Nope to get it done:
+
+```python
+import json
+import subprocess
+from pathlib import Path
+from typing import Iterable, List, Optional, Type
+
+from dagster._core.execution.context.compute import AssetExecutionContext
+from dagster._core.pipes.context import PipesExecutionResult
+from dagster._core.pipes.subprocess import PipesSubprocessClient
+from dagster._nope.project import (
+    NopeInvocationTarget,
+    NopeInvocationTargetManifest,
+    NopeProject,
+)
+
+
+def get_current_branch() -> Optional[str]:
+    return get_stripped_stdout(["git", "rev-parse", "--abbrev-ref", "HEAD"])
+
+def get_stripped_stdout(cmds: List[str]) -> str:
+    result = subprocess.run(
+        cmds, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, text=True
+    )
+    return result.stdout.strip()
+
+
+def modal_has_env(env_name: str) -> bool:
+    modal_list_output = json.loads(get_stripped_stdout(["modal", "environment", "list", "--json"]))
+    for model_env in modal_list_output:
+        if model_env["name"] == env_name:
+            return True
+    return False
+
+def modal_create_env(env_name: str) -> None:
+    subprocess.run(
+        ["modal", "environment", "create", env_name],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=True,
+    )
+
+class ModalKicktestInvocationTarget(NopeInvocationTarget):
+    @property
+    def required_resource_keys(self) -> set:
+        return {"subprocess_client"}
+
+    class InvocationTargetManifest(NopeInvocationTargetManifest):
+        @property
+        def tags(self) -> dict:
+            return {"kind": "modal"}
+
+    def invoke(
+        self, context: AssetExecutionContext, subprocess_client: PipesSubprocessClient
+    ) -> Iterable[PipesExecutionResult]:
+        branch_name = get_current_branch()
+
+        if branch_name is None:
+            raise Exception("Could not determine current branch")
+
+        if not modal_has_env(env_name=branch_name):
+            modal_create_env(env_name=branch_name)
+
+        return subprocess_client.run(
+            context=context,
+            command=["modal", "run", "-e", branch_name, self.python_script_path],
+        ).get_results()
+
+
+class ModalKicktestProject(NopeProject):
+    @classmethod
+    def map_manifest_to_target_class(cls, target_type: str, full_manifest: dict) -> Type:
+        if target_type == "modal":
+            return ModalKicktestInvocationTarget
+        raise Exception(f"Target type {target_type} not supported by {cls.__name__}")
+
+
+defs = ModalKicktestProject.make_definitions(
+    defs_path=Path(__file__).resolve().parent / Path("defs")
+)
+```
+
+The above code crafts a new `NopeInvocationTarget` subclass that does the magic here. It gets the current github branch and will use that as the modal environment name. If the environment does not exist it creates it. And then it invokes each target in that environment.
+
+This means that all of your devs can be executing code in the cloud without stomping on eachother's work. Each branch will upload to a different environment with its own code, logs etc.
+
+The stakeholders don't have to think about this at all. They just make files and branches and everything works.
+
+
 ## Future work
 
 * Asset checks: Straightforward to add asset check support to the script manifest. Just need to do so.
