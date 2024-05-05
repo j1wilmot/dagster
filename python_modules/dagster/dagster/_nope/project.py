@@ -195,7 +195,7 @@ class NopeInvocationTargetManifest:
         return {}
 
 
-class NopeExecutionTarget:
+class NopeInvocationTarget:
     def __init__(self, script_manifest: NopeInvocationTargetManifest):
         self._script_manifest = script_manifest
 
@@ -241,7 +241,7 @@ class NopeExecutionTarget:
     def invoke(self, context: AssetExecutionContext, **kwargs) -> Any: ...
 
 
-class NopeSubprocessExecutionTarget(NopeExecutionTarget):
+class NopeSubprocessInvocationTarget(NopeInvocationTarget):
     @property
     def required_resource_keys(self) -> set:
         return {"subprocess_client"}
@@ -263,10 +263,10 @@ class NoopIOManager(IOManager):
 
 class NopeProject:
     @classmethod
-    def create_execution_target(
+    def create_invocation_target(
         cls, script_manifest: NopeInvocationTargetManifest
-    ) -> NopeExecutionTarget:
-        return NopeSubprocessExecutionTarget(script_manifest)
+    ) -> NopeInvocationTarget:
+        return NopeSubprocessInvocationTarget(script_manifest)
 
     @classmethod
     def asset_manifest_class(cls) -> Type:
@@ -330,7 +330,7 @@ class NopeProject:
     def make_assets_def(
         cls, group_folder: Path, full_python_path: Path, full_yaml_path: Path
     ) -> AssetsDefinition:
-        script_instance = cls.create_execution_target(
+        script_instance = cls.create_invocation_target(
             cls.script_manifest_class()(
                 group_folder=group_folder,
                 full_python_path=full_python_path,
