@@ -1,7 +1,7 @@
 import json
 import subprocess
 from pathlib import Path
-from typing import Iterable, List, Optional, Type
+from typing import Iterable, List, Optional
 
 from dagster import get_dagster_logger
 from dagster._core.execution.context.compute import AssetExecutionContext
@@ -67,10 +67,8 @@ class ModalKicktestInvocationTarget(NopeSubprocessInvocationTarget):
 
 class ModalKicktestProject(NopeProject):
     @classmethod
-    def map_manifest_to_target_class(cls, target_type: str, full_manifest: dict) -> Type:
-        if target_type == "modal":
-            return ModalKicktestInvocationTarget
-        raise Exception(f"Target type {target_type} not supported by {cls.__name__}")
+    def invocation_target_map(cls) -> dict:
+        return {"modal": ModalKicktestInvocationTarget}
 
 
 defs = ModalKicktestProject.make_definitions(

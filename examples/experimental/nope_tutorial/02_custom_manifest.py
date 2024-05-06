@@ -1,5 +1,4 @@
 from pathlib import Path
-from typing import Type
 
 from dagster._core.execution.context.compute import AssetExecutionContext
 from dagster._core.pipes.subprocess import PipesSubprocessClient
@@ -36,13 +35,8 @@ class TutorialSubprocessInvocationTarget(NopeSubprocessInvocationTarget):
 
 class TutorialProject(NopeProject):
     @classmethod
-    def map_manifest_to_target_class(cls, target_type: str, full_manifest: dict) -> Type:
-        if target_type == "fancy":
-            return FancyInvocationTarget
-        elif target_type == "subprocess":
-            return TutorialSubprocessInvocationTarget
-
-        raise Exception(f"Target type {target_type} not supported by {cls.__name__}")
+    def invocation_target_map(cls) -> dict:
+        return {"fancy": FancyInvocationTarget, "subprocess": TutorialSubprocessInvocationTarget}
 
 
 defs = TutorialProject.make_definitions(

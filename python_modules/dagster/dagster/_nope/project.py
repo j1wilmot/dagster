@@ -243,13 +243,10 @@ class NoopIOManager(IOManager):
 
 class NopeProject:
     @classmethod
-    def map_manifest_to_target_class(cls, target_type: str, full_manifest: dict) -> Type:
-        # out of the box targets
-        if target_type == "subprocess":
-            from .subprocess import NopeSubprocessInvocationTarget
+    def invocation_target_map(cls) -> dict:
+        from dagster._nope.subprocess import NopeSubprocessInvocationTarget
 
-            return NopeSubprocessInvocationTarget
-        raise NotImplementedError(f"Target type {target_type} not supported by {cls.__name__}")
+        return {"subprocess": NopeSubprocessInvocationTarget}
 
     @classmethod
     def make_assets_defs(cls, defs_path: Path) -> Sequence[AssetsDefinition]:
@@ -302,10 +299,8 @@ class NopeProject:
             f"Invalid manifest file {full_yaml_path}. Must have top-level target key",
         )
 
-        target_cls = cls.map_manifest_to_target_class(
-            target_type=full_manifest["target"], full_manifest=full_manifest
-        )
-
+        target_map = cls.invocation_target_map()
+        target_cls = target_map[full_manifest["target"]]
         script_instance = target_cls(
             target_cls.invocation_target_manifest_class()(
                 group_name=group_name,
