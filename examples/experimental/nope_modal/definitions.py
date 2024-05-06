@@ -3,6 +3,7 @@ import subprocess
 from pathlib import Path
 from typing import Iterable, List, Optional, Type
 
+from dagster import get_dagster_logger
 from dagster._core.execution.context.compute import AssetExecutionContext
 from dagster._core.pipes.context import PipesExecutionResult
 from dagster._core.pipes.subprocess import PipesSubprocessClient
@@ -17,6 +18,7 @@ def get_current_branch() -> Optional[str]:
 
 
 def get_stripped_stdout(cmds: List[str]) -> str:
+    get_dagster_logger().info(f"Running command: {' '.join(cmds)}")
     result = subprocess.run(
         cmds, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, text=True
     )
