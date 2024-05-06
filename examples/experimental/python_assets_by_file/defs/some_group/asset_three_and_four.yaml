@@ -1,8 +1,0 @@
-target: subprocess
-assets:
-  asset_three:
-    deps:
-      - some_group/asset_one
-  asset_four:
-    deps:
-      - some_group/asset_one
