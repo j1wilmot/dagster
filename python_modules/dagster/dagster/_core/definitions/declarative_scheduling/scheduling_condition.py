@@ -52,9 +52,9 @@ class SchedulingCondition(ABC, DagsterModel):
             unique_id=unique_id,
         )
 
-    def get_unique_id(self, parent_unique_id: Optional[str]) -> str:
+    def get_unique_id(self, parent_unique_id: Optional[str], index: Optional[int]) -> str:
         """Returns a unique identifier for this condition within the broader condition tree."""
-        parts = [str(parent_unique_id), self.__class__.__name__, self.description]
+        parts = [str(parent_unique_id), str(index), self.__class__.__name__, self.description]
         return non_secure_md5_hash_str("".join(parts).encode())
 
     @abstractmethod
@@ -146,6 +146,23 @@ class SchedulingCondition(ABC, DagsterModel):
         from .operands import ParentNewerCondition
 
         return ParentNewerCondition()
+
+    @staticmethod
+    def eager() -> "SchedulingCondition":
+        missing_or_parent_updated = (
+            SchedulingCondition.parent_newer()
+            | SchedulingCondition.any_deps_match(SchedulingCondition.requested_this_tick())
+            | SchedulingCondition.missing()
+        )
+        any_parent_missing = SchedulingCondition.any_deps_match(
+            SchedulingCondition.missing() & ~SchedulingCondition.requested_this_tick()
+        )
+        return (
+            SchedulingCondition.in_latest_time_window()
+            & missing_or_parent_updated
+            & ~any_parent_missing
+            & ~SchedulingCondition.in_progress()
+        )
 
 
 class SchedulingResult(DagsterModel):

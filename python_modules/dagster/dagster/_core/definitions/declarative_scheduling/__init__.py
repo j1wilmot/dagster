@@ -3,6 +3,9 @@ from .operands import (
     InLatestTimeWindowCondition as InLatestTimeWindowCondition,
     InProgressSchedulingCondition as InProgressSchedulingCondition,
     MissingSchedulingCondition as MissingSchedulingCondition,
+    ParentNewerCondition as ParentNewerCondition,
+    UpdatedSinceCronCondition as UpdatedSinceCronCondition,
+    WillBeRequestedCondition as WillBeRequestedCondition,
 )
 from .operators import (
     AllDepsCondition as AllDepsCondition,

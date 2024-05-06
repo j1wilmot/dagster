@@ -7,8 +7,10 @@ from dagster._core.definitions.declarative_scheduling.scheduling_condition impor
 )
 from dagster._core.definitions.declarative_scheduling.scheduling_context import SchedulingContext
 from dagster._core.definitions.events import AssetKeyPartitionKey
+from dagster._serdes.serdes import whitelist_for_serdes
 
 
+@whitelist_for_serdes
 class ParentNewerCondition(SchedulingCondition):
     @property
     def description(self) -> str:
