@@ -242,11 +242,6 @@ class FancyRuntimeResource:
 
 
 class FancyInvocationTarget(NopeInvocationTarget):
-    # Temporary state of affairs. We should infer from signature of invoke.
-    @property
-    def required_resource_keys(self) -> set:
-        return {"fancy_runtime_resource"}
-
     def invoke(self, context: AssetExecutionContext, fancy_runtime_resource: FancyRuntimeResource):
         # Platform owner has complete control here. Can do whatever they want
         fancy_runtime_resource.call(context.selected_asset_keys)
@@ -345,10 +340,6 @@ def modal_create_env(env_name: str) -> None:
     )
 
 class ModalKicktestInvocationTarget(NopeInvocationTarget):
-    @property
-    def required_resource_keys(self) -> set:
-        return {"subprocess_client"}
-
     class InvocationTargetManifest(NopeInvocationTargetManifest):
         @property
         def tags(self) -> dict:
