@@ -712,10 +712,7 @@ class DbtCliInvocation:
         row_count = query_result[1][0]["row_count"]
         additional_metadata = {**TableMetadataSet(row_count=row_count)}
 
-        if isinstance(event, Output):
-            return event.with_metadata(metadata={**event.metadata, **additional_metadata})
-        else:
-            return event._replace(metadata={**event.metadata, **additional_metadata})
+        return event.with_metadata(metadata={**event.metadata, **additional_metadata})
 
     def _stream_dbt_events_and_enqueue_postprocessing(
         self,
