@@ -165,8 +165,8 @@ class NopeInvocationTargetManifest:
 
 
 class NopeInvocationTarget:
-    def __init__(self, script_manifest: NopeInvocationTargetManifest):
-        self._script_manifest = script_manifest
+    def __init__(self, target_manifest: NopeInvocationTargetManifest):
+        self._target_manifest = target_manifest
 
     # TODO: infer this from execute args
     @property
@@ -174,14 +174,14 @@ class NopeInvocationTarget:
     def required_resource_keys(self) -> set: ...
 
     @property
-    def script_manifest(self) -> NopeInvocationTargetManifest:
-        return self._script_manifest
+    def target_manifest(self) -> NopeInvocationTargetManifest:
+        return self._target_manifest
 
     def to_assets_def(self) -> AssetsDefinition:
         @multi_asset(
-            specs=self.script_manifest.asset_specs,
-            name=self.script_manifest.op_name,
-            op_tags=self.script_manifest.tags,
+            specs=self.target_manifest.asset_specs,
+            name=self.target_manifest.op_name,
+            op_tags=self.target_manifest.tags,
             required_resource_keys=self.required_resource_keys,
         )
         def _nope_multi_asset(context: AssetExecutionContext):

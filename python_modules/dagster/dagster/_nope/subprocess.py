@@ -61,11 +61,11 @@ class NopeSubprocessInvocationTarget(NopeInvocationTarget):
     class AssetManifest(NopeAssetManifest):
         @property
         def invocation_target_python_path(self) -> Path:
-            target_manifest = check.inst(
+            # TODO: Use generics to avoid type check?
+            return check.inst(
                 self.invocation_target_manifest,
                 NopeSubprocessInvocationTarget.InvocationTargetManifest,
-            )
-            return target_manifest.full_python_path.resolve()
+            ).full_python_path.resolve()
 
         @property
         def code_version(self) -> Optional[str]:
@@ -89,10 +89,11 @@ class NopeSubprocessInvocationTarget(NopeInvocationTarget):
     @property
     def full_str_python_path(self) -> str:
         # TODO: Use generics to avoid type check?
-        target_manifest = check.inst(
-            self.script_manifest, NopeSubprocessInvocationTarget.InvocationTargetManifest
+        return str(
+            check.inst(
+                self.target_manifest, NopeSubprocessInvocationTarget.InvocationTargetManifest
+            ).full_python_path
         )
-        return str(target_manifest.full_python_path)
 
     def invoke(
         self, context: AssetExecutionContext, subprocess_client: PipesSubprocessClient
