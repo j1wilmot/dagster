@@ -4,17 +4,15 @@ from typing import Type
 from dagster._core.execution.context.compute import AssetExecutionContext
 from dagster._core.pipes.subprocess import PipesSubprocessClient
 from dagster._nope.project import (
-    NopeAssetManifest,
     NopeInvocationTarget,
-    NopeInvocationTargetManifest,
     NopeProject,
-    NopeSubprocessInvocationTarget,
 )
+from dagster._nope.subprocess import NopeSubprocessInvocationTarget
 
 
 class FancyRuntimeResource:
     def call(self, asset_keys) -> None:
-        print(f"FancyRuntimeResource called on asset keys: {asset_keys}")
+        print(f"FancyRuntimeResource called on asset keys: {asset_keys}")  # noqa: T201
 
 
 class FancyInvocationTarget(NopeInvocationTarget):
@@ -28,12 +26,12 @@ class FancyInvocationTarget(NopeInvocationTarget):
 
 
 class TutorialSubprocessInvocationTarget(NopeSubprocessInvocationTarget):
-    class InvocationTargetManifest(NopeInvocationTargetManifest):
+    class InvocationTargetManifest(NopeSubprocessInvocationTarget.InvocationTargetManifest):
         @property
         def tags(self) -> dict:
             return {**{"kind": "python"}, **super().tags}
 
-    class AssetManifest(NopeAssetManifest):
+    class AssetManifest(NopeSubprocessInvocationTarget.AssetManifest):
         @property
         def owners(self) -> list:
             owners_from_manifest_file = super().owners

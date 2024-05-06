@@ -1,4 +1,7 @@
 target: subprocess
+
+script: asset_two.py
+
 assets:
   asset_two:
     deps:

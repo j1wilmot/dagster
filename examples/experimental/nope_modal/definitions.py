@@ -7,10 +7,9 @@ from dagster._core.execution.context.compute import AssetExecutionContext
 from dagster._core.pipes.context import PipesExecutionResult
 from dagster._core.pipes.subprocess import PipesSubprocessClient
 from dagster._nope.project import (
-    NopeInvocationTarget,
-    NopeInvocationTargetManifest,
     NopeProject,
 )
+from dagster._nope.subprocess import NopeSubprocessInvocationTarget
 
 
 def get_current_branch() -> Optional[str]:
@@ -41,12 +40,12 @@ def modal_create_env(env_name: str) -> None:
     )
 
 
-class ModalKicktestInvocationTarget(NopeInvocationTarget):
+class ModalKicktestInvocationTarget(NopeSubprocessInvocationTarget):
     @property
     def required_resource_keys(self) -> set:
         return {"subprocess_client"}
 
-    class InvocationTargetManifest(NopeInvocationTargetManifest):
+    class InvocationTargetManifest(NopeSubprocessInvocationTarget.InvocationTargetManifest):
         @property
         def tags(self) -> dict:
             return {"kind": "modal"}
@@ -64,7 +63,7 @@ class ModalKicktestInvocationTarget(NopeInvocationTarget):
 
         return subprocess_client.run(
             context=context,
-            command=["modal", "run", "-e", branch_name, self.python_script_path],
+            command=["modal", "run", "-e", branch_name, self.full_str_python_path],
         ).get_results()
 
 

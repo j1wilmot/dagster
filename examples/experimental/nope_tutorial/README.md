@@ -51,6 +51,7 @@ Next you need a manifest file, which is a yaml file that tells Dagster how to in
 ```yaml
 # in defs/group_a/asset_one.yaml
 target: subprocess
+script: asset_one.py
 ```
 
 With these two files in place we can load them in Dagster UI with `dagster dev -f definitions.py`.
@@ -83,6 +84,8 @@ Now we need to tell the system about this dependency. We do that via a manifest 
 ```yaml
 # in defs/group_a/asset_two.yaml
 target: subprocess
+script: asset_two.py
+
 assets:
   asset_two:
     deps:
@@ -149,6 +152,8 @@ Now we need to inform the system that this script materializes two assets, and t
 
 ```yaml
 # defs/group_a/assets_three_and_four.yaml
+target: subprocess
+script: assets_three_and_four.py
 assets:
   asset_three:
     deps:

@@ -1,23 +1,18 @@
-import hashlib
-import shutil
 from abc import abstractmethod
-from functools import cached_property
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Iterable, List, Mapping, Optional, Sequence, Type, Union
+from typing import TYPE_CHECKING, Any, List, Mapping, Optional, Sequence, Type, Union
 
 import yaml
 
 from dagster import (
     AssetSpec,
     _check as check,
-    file_relative_path,
     multi_asset,
 )
 from dagster._core.definitions.asset_dep import CoercibleToAssetDep
 from dagster._core.definitions.asset_key import AssetKey, CoercibleToAssetKey
 from dagster._core.definitions.assets import AssetsDefinition
 from dagster._core.execution.context.compute import AssetExecutionContext
-from dagster._core.pipes.context import PipesExecutionResult
 from dagster._core.pipes.subprocess import PipesSubprocessClient
 from dagster._core.storage.io_manager import IOManager
 from dagster._seven import is_subclass
@@ -30,24 +25,6 @@ except ImportError:
 if TYPE_CHECKING:
     from dagster._core.definitions.definitions_class import Definitions
 
-# Directory path
-directory = Path(file_relative_path(__file__, "assets"))
-
-
-def compute_file_hash(file_path, hash_algorithm="sha256") -> Any:
-    # Initialize the hash object
-    hash_object = hashlib.new(hash_algorithm)
-
-    # Open the file in binary mode and read its contents
-    with open(file_path, "rb") as file:
-        # Update the hash object with the file contents
-        while chunk := file.read(4096):  # Read the file in chunks to conserve memory
-            hash_object.update(chunk)
-
-    # Get the hexadecimal digest of the hash
-    file_hash = hash_object.hexdigest()
-    return file_hash
-
 
 def deps_from_asset_manifest(raw_asset_manifest_obj: dict) -> Sequence[CoercibleToAssetDep]:
     if not raw_asset_manifest_obj or "deps" not in raw_asset_manifest_obj:
@@ -59,49 +36,35 @@ def deps_from_asset_manifest(raw_asset_manifest_obj: dict) -> Sequence[Coercible
     ]
 
 
-def build_description_from_python_file(file_path: Path) -> str:
-    return (
-        f"""Python file "{file_path.name}":
-"""
-        + "```\n"
-        + file_path.read_text()
-        + "\n```"
-    )
-
-
 class NopeAssetManifest:
     def __init__(
         self,
         *,
-        asset_manifest_obj,
-        full_python_path: Path,
+        invocation_target_manifest: "NopeInvocationTargetManifest",
+        asset_manifest_obj: dict,
         group_name: str,
         asset_key_parts: List[str],
     ) -> None:
+        self.invocation_target_manifest = invocation_target_manifest
         self.asset_manifest_obj = asset_manifest_obj or {}
-        self.full_python_path = full_python_path
         self._group_name = group_name
         self.asset_key_parts = asset_key_parts
-
-    @property
-    def code_version(self) -> str:
-        return compute_file_hash(self.full_python_path)
 
     @property
     def deps(self) -> Sequence[CoercibleToAssetDep]:
         return deps_from_asset_manifest(self.asset_manifest_obj)
 
     @property
-    def description(self) -> str:
-        return build_description_from_python_file(self.full_python_path)
-
-    @property
     def asset_key(self) -> CoercibleToAssetKey:
         return AssetKey([self.group_name] + self.asset_key_parts)
 
     @property
-    def file_name_parts(self) -> List[str]:
-        return self.full_python_path.stem.split(".")
+    def description(self) -> Optional[str]:
+        return self.asset_manifest_obj.get("description", "")
+
+    @property
+    def code_version(self) -> Optional[str]:
+        return None
 
     @property
     def group_name(self) -> str:
@@ -141,24 +104,17 @@ class NopeInvocationTargetManifest:
         self,
         *,
         group_name: str,
-        full_python_path: Path,
-        full_manifest_path: Optional[Path],
+        full_manifest_path: Path,
         asset_manifest_class: Type,
     ) -> None:
         self._group_name = group_name
-        self.full_python_path = full_python_path
-        self.full_manifest_obj = (
-            yaml.load(full_manifest_path.read_text(), Loader=Loader) if full_manifest_path else {}
-        )
+        self.full_manifest_path = full_manifest_path
+        self.full_manifest_obj = yaml.load(full_manifest_path.read_text(), Loader=Loader)
         self.asset_manifest_class = asset_manifest_class
 
     @property
     def target(self) -> str:
         return self.full_manifest_obj["target"]
-
-    @property
-    def default_asset_keys_parts(self) -> Sequence[str]:
-        return self.full_python_path.stem.split(".")
 
     @property
     def asset_manifests(self) -> Sequence[NopeAssetManifest]:
@@ -167,10 +123,10 @@ class NopeInvocationTargetManifest:
         if not raw_asset_manifests:
             return [
                 self.asset_manifest_class(
+                    invocation_target_manifest=self,
                     asset_manifest_obj=self.full_manifest_obj,
-                    full_python_path=self.full_python_path,
                     group_name=self._group_name,
-                    asset_key_parts=self.default_asset_keys_parts,
+                    asset_key_parts=[self.full_manifest_path.stem],
                 )
             ]
 
@@ -178,8 +134,8 @@ class NopeInvocationTargetManifest:
         for asset_name, raw_asset_manifest in raw_asset_manifests.items():
             asset_manifests.append(
                 self.asset_manifest_class(
+                    invocation_target_manifest=self,
                     asset_manifest_obj=raw_asset_manifest,
-                    full_python_path=self.full_python_path,
                     group_name=self._group_name,
                     asset_key_parts=asset_name.split("."),
                 )
@@ -188,10 +144,11 @@ class NopeInvocationTargetManifest:
 
     @property
     def file_name_parts(self) -> List[str]:
-        return self.full_python_path.stem.split(".")
+        return self.full_manifest_path.stem.split(".")
 
     @property
     def op_name(self) -> str:
+        # TODO Do this explicitly in manifest file
         return self.file_name_parts[-1]
 
     @property
@@ -236,17 +193,6 @@ class NopeInvocationTarget:
 
         return _nope_multi_asset
 
-    @cached_property
-    def python_executable_path(self) -> str:
-        python_executable = shutil.which("python")
-        if not python_executable:
-            raise ValueError("Python executable not found.")
-        return python_executable
-
-    @property
-    def python_script_path(self) -> str:
-        return str(self.script_manifest.full_python_path.resolve())
-
     # Resources as kwargs. Must match set in required_resource_keys
     # Can return anything that the multi_asset decorator can accept
     @abstractmethod
@@ -276,18 +222,6 @@ class NopeInvocationTarget:
         return NopeInvocationTargetManifest
 
 
-class NopeSubprocessInvocationTarget(NopeInvocationTarget):
-    @property
-    def required_resource_keys(self) -> set:
-        return {"subprocess_client"}
-
-    def invoke(
-        self, context: AssetExecutionContext, subprocess_client: PipesSubprocessClient
-    ) -> Iterable[PipesExecutionResult]:
-        command = [self.python_executable_path, self.python_script_path]
-        return subprocess_client.run(context=context, command=command).get_results()
-
-
 # Nope doesn't support IO managers, so just provide a noop one
 class NoopIOManager(IOManager):
     def handle_output(self, context, obj) -> None: ...
@@ -299,7 +233,10 @@ class NoopIOManager(IOManager):
 class NopeProject:
     @classmethod
     def map_manifest_to_target_class(cls, target_type: str, full_manifest: dict) -> Type:
+        # out of the box targets
         if target_type == "subprocess":
+            from .subprocess import NopeSubprocessInvocationTarget
+
             return NopeSubprocessInvocationTarget
         raise NotImplementedError(f"Target type {target_type} not supported by {cls.__name__}")
 
@@ -311,18 +248,15 @@ class NopeProject:
                 continue
 
             yaml_files = {}
-            python_files = {}
+            # python_files = {}
             for full_path in group_folder.iterdir():
                 if full_path.suffix == ".yaml":
                     yaml_files[full_path.stem] = full_path
-                elif full_path.suffix == ".py":
-                    python_files[full_path.stem] = full_path
 
-            for stem_name in set(python_files) & set(yaml_files):
+            for stem_name in set(yaml_files):
                 assets_defs.append(
                     cls.make_assets_def(
                         group_name=group_folder.name,
-                        full_python_path=python_files[stem_name],
                         full_yaml_path=yaml_files[stem_name],
                     )
                 )
@@ -350,9 +284,7 @@ class NopeProject:
         )
 
     @classmethod
-    def make_assets_def(
-        cls, group_name: str, full_python_path: Path, full_yaml_path: Path
-    ) -> AssetsDefinition:
+    def make_assets_def(cls, group_name: str, full_yaml_path: Path) -> AssetsDefinition:
         full_manifest = yaml.load(full_yaml_path.read_text(), Loader=Loader)
         check.invariant(
             full_manifest and "target" in full_manifest,
@@ -366,7 +298,6 @@ class NopeProject:
         script_instance = target_cls(
             target_cls.invocation_target_manifest_class()(
                 group_name=group_name,
-                full_python_path=full_python_path,
                 full_manifest_path=full_yaml_path,
                 asset_manifest_class=target_cls.asset_manifest_class(),
             )
