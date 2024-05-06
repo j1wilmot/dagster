@@ -164,11 +164,16 @@ class NopeInvocationTargetManifest:
         return {}
 
 
+def resources_without_io_manager(context: AssetExecutionContext):
+    original_resources = context.resources.original_resource_dict
+    return {k: v for k, v in original_resources.items() if k != "io_manager"}
+
+
 class NopeInvocationTarget:
     def __init__(self, target_manifest: NopeInvocationTargetManifest):
         self._target_manifest = target_manifest
 
-    # TODO: infer this from execute args
+    # TODO: infer this from invoke args
     @property
     @abstractmethod
     def required_resource_keys(self) -> set: ...
@@ -185,16 +190,12 @@ class NopeInvocationTarget:
             required_resource_keys=self.required_resource_keys,
         )
         def _nope_multi_asset(context: AssetExecutionContext):
-            import copy
-
-            resource_dict = copy.copy(context.resources.original_resource_dict)
-            del resource_dict["io_manager"]
-            return self.invoke(context=context, **resource_dict)
+            return self.invoke(context=context, **resources_without_io_manager(context))
 
         return _nope_multi_asset
 
-    # Resources as kwargs. Must match set in required_resource_keys
-    # Can return anything that the multi_asset decorator can accept
+    # Resources as kwargs. Must match set in required_resource_keys.
+    # Can return anything that the multi_asset decorator can accept, hence typed as Any
     @abstractmethod
     def invoke(self, context: AssetExecutionContext, **kwargs) -> Any: ...
 
@@ -222,7 +223,8 @@ class NopeInvocationTarget:
         return NopeInvocationTargetManifest
 
 
-# Nope doesn't support IO managers, so just provide a noop one
+# Nope doesn't support IO managers, so just provide a noop one so we don't run into annoyances
+# like the default IO manager not supporting partitioning out of the box
 class NoopIOManager(IOManager):
     def handle_output(self, context, obj) -> None: ...
 
@@ -269,7 +271,7 @@ class NopeProject:
     ) -> "Definitions":
         from dagster._core.definitions.definitions_class import Definitions
 
-        # TODO. When we add support for more default invocation targtes, make
+        # TODO. When we add support for more default invocation targets, make
         # an initial pass across the manifests to see what resources we actually
         # need to create
 
