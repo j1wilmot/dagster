@@ -394,6 +394,7 @@ export const BackfillStatusTag = ({
     return <BackfillStatusTagForPage backfill={backfill} />;
   }
 
+  const totalStatuses = counts ? Object.values(counts).reduce((a, b) => a + b, 0) : 0;
   switch (backfill.status) {
     case BulkActionStatus.REQUESTED:
       return <Tag>In progress</Tag>;
@@ -417,7 +418,7 @@ export const BackfillStatusTag = ({
       if (!counts) {
         return <div style={{color: Colors.textLight()}}>None</div>;
       }
-      if (counts[RunStatus.SUCCESS] === backfill.partitionNames.length) {
+      if (counts[RunStatus.SUCCESS] === totalStatuses) {
         return <Tag intent="success">Completed</Tag>;
       }
       if (Array.from(inProgressStatuses).some((status) => counts[status])) {
