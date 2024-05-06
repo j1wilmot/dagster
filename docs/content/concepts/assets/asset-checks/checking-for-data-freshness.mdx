@@ -14,7 +14,7 @@ As freshness checks don't depend on a specific root cause, it makes them helpful
 - A backed up run queue
 - Runs are taking longer than expected to complete
 
-By the end of this guide, you'll understand what freshness checks are and how to implement them in your data pipelines.
+By the end of this guide, you'll understand what freshness checks are, how to implement them in your data pipelines, and how to be alerted when your assets are overdue.
 
 ---
 
@@ -41,6 +41,7 @@ Before continuing, you should be familiar with:
 - [Software-defined Assets](/concepts/assets/software-defined-assets)
 - [Asset checks](/concepts/assets/asset-checks)
 - [Schedules](/concepts/partitions-schedules-sensors/schedules) and/or [sensors](/concepts/partitions-schedules-sensors/sensors)
+- [Alerts](/dagster-plus/managing-deployments/alerts) (Dagster+ only)
 
 ---
 
@@ -355,6 +356,39 @@ height={1944}
 />
 
 ---
+
+## Alert on overdue assets (Dagster+ only)
+
+In Dagster+, you can set up [alerts](/dagster-plus/managing-deployments/alerts) to notify you when an asset is overdue for an update. By default, a freshness check will fail with severity `WARN` if an asset is overdue for an update. Then, in order to alert on overdue assets, you'll want to create an alert policy that triggers on asset check failures with severity `WARN` (or `ERROR` if you've overridden the default severity), for your specific assets which you've defined freshness checks for. Asset alert policies can currently be targeted at specific asset keys, asset groups, or all assets.
+
+To become more familiar with the various ways alert policies can be set up, see the guide on [managing alert policies](/dagster-plus/managing-deployments/alerts/managing-alerts-in-ui).
+
+<TabGroup>
+<TabItem name="Option 1: Use the alert policy editor UI">
+1. Navigate to the alert policy editor window in the Dagster UI.
+2. Select the `Asset` alert policy type.
+3. First select an asset (or set of assets) to target with the alert policy. You can target all assets, a specific asset key, or an asset group.
+4. Check the box for `Failed (WARN)` or `Failed (ERROR)` severity, depending on the severity set for freshness check failure.
+5. Select a notification service, provide the necessary information, and save the alert policy.
+</TabItem>
+<TabItem name="Option 2: from config">
+Here we provide an example of how you could define an asset-check-targeted alert policy (which would
+also target freshness checks) in your alert policy configuration file:
+
+```yaml
+alert_policies:
+  - name: "Warning checks on my_asset_key"
+    description: "Alert on WARN checks for my_asset_key"
+    target:
+      asset_key: "my_asset_key"
+    severity: "WARN"
+    notification_service: "slack"
+    notification_config:
+      email:
+        email_addresses:
+          - "foo@bar.com"
+          - "bar@foo.com"
+```
 
 ## APIs in this guide
 
