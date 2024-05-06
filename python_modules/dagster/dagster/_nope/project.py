@@ -147,39 +147,44 @@ class NopeInvocationTargetManifest:
     ) -> None:
         self._group_name = group_name
         self.full_python_path = full_python_path
-        self.yaml_file_as_object = (
+        self.full_manifest_obj = (
             yaml.load(full_manifest_path.read_text(), Loader=Loader) if full_manifest_path else {}
         )
         self.asset_manifest_class = asset_manifest_class
 
     @property
     def target(self) -> str:
-        return self.yaml_file_as_object["target"]
+        return self.full_manifest_obj["target"]
+
+    @property
+    def default_asset_keys_parts(self) -> Sequence[str]:
+        return self.full_python_path.stem.split(".")
 
     @property
     def asset_manifests(self) -> Sequence[NopeAssetManifest]:
-        if self.yaml_file_as_object and "assets" in self.yaml_file_as_object:
-            raw_asset_manifests = self.yaml_file_as_object["assets"]
-            asset_manifests = []
-            for asset_name, raw_asset_manifest in raw_asset_manifests.items():
-                asset_manifests.append(
-                    self.asset_manifest_class(
-                        asset_manifest_obj=raw_asset_manifest,
-                        full_python_path=self.full_python_path,
-                        group_name=self._group_name,
-                        asset_key_parts=asset_name.split("."),
-                    )
-                )
-            return asset_manifests
-        else:
+        raw_asset_manifests = self.full_manifest_obj.get("assets")
+        # If there are no explicit asset manifest
+        if not raw_asset_manifests:
             return [
                 self.asset_manifest_class(
-                    asset_manifest_obj=self.yaml_file_as_object,
+                    asset_manifest_obj=self.full_manifest_obj,
                     full_python_path=self.full_python_path,
                     group_name=self._group_name,
-                    asset_key_parts=self.full_python_path.stem.split("."),
+                    asset_key_parts=self.default_asset_keys_parts,
                 )
             ]
+
+        asset_manifests = []
+        for asset_name, raw_asset_manifest in raw_asset_manifests.items():
+            asset_manifests.append(
+                self.asset_manifest_class(
+                    asset_manifest_obj=raw_asset_manifest,
+                    full_python_path=self.full_python_path,
+                    group_name=self._group_name,
+                    asset_key_parts=asset_name.split("."),
+                )
+            )
+        return asset_manifests
 
     @property
     def file_name_parts(self) -> List[str]:

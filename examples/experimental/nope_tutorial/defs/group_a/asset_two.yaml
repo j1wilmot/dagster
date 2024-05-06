@@ -1,3 +1,5 @@
 target: subprocess
-deps:
-  - group_a/asset_one
+assets:
+  asset_two:
+    deps:
+      - group_a/asset_one

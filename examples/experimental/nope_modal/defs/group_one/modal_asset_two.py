@@ -1,4 +1,3 @@
-
 import modal  # type: ignore
 
 app = modal.App("schrockn-project-pipes-kicktest")

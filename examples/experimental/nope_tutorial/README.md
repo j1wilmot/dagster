@@ -83,8 +83,10 @@ Now we need to tell the system about this dependency. We do that via a manifest 
 ```yaml
 # in defs/group_a/asset_two.yaml
 target: subprocess
-deps:
-  - group_a/asset_one
+assets:
+  asset_two:
+    deps:
+      - group_a/asset_one
 ```
 
 Now reload your definitions and you should see a dependency graph:

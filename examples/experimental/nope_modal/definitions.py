@@ -16,6 +16,7 @@ from dagster._nope.project import (
 def get_current_branch() -> Optional[str]:
     return get_stripped_stdout(["git", "rev-parse", "--abbrev-ref", "HEAD"])
 
+
 def get_stripped_stdout(cmds: List[str]) -> str:
     result = subprocess.run(
         cmds, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, text=True
@@ -30,6 +31,7 @@ def modal_has_env(env_name: str) -> bool:
             return True
     return False
 
+
 def modal_create_env(env_name: str) -> None:
     subprocess.run(
         ["modal", "environment", "create", env_name],
@@ -37,6 +39,7 @@ def modal_create_env(env_name: str) -> None:
         stderr=subprocess.PIPE,
         check=True,
     )
+
 
 class ModalKicktestInvocationTarget(NopeInvocationTarget):
     @property
