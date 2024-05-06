@@ -41,10 +41,6 @@ def modal_create_env(env_name: str) -> None:
 
 
 class ModalKicktestInvocationTarget(NopeSubprocessInvocationTarget):
-    @property
-    def required_resource_keys(self) -> set:
-        return {"subprocess_client"}
-
     class InvocationTargetManifest(NopeSubprocessInvocationTarget.InvocationTargetManifest):
         @property
         def tags(self) -> dict:

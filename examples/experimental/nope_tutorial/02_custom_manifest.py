@@ -16,10 +16,6 @@ class FancyRuntimeResource:
 
 
 class FancyInvocationTarget(NopeInvocationTarget):
-    @property
-    def required_resource_keys(self) -> set:
-        return {"fancy_runtime_resource"}
-
     def invoke(self, context: AssetExecutionContext, fancy_runtime_resource: FancyRuntimeResource):
         # platform owner has complete control here
         fancy_runtime_resource.call(context.selected_asset_keys)

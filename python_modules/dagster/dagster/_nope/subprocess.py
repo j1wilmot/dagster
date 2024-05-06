@@ -75,10 +75,6 @@ class NopeSubprocessInvocationTarget(NopeInvocationTarget):
         def description(self) -> str:
             return build_description_from_python_file(self.invocation_target_python_path)
 
-    @property
-    def required_resource_keys(self) -> set:
-        return {"subprocess_client"}
-
     @cached_property
     def python_executable_path(self) -> str:
         python_executable = shutil.which("python")

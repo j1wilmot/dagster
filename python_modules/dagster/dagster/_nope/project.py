@@ -1,6 +1,8 @@
+import inspect
 from abc import abstractmethod
+from functools import cached_property
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, List, Mapping, Optional, Sequence, Type, Union
+from typing import TYPE_CHECKING, Any, List, Mapping, Optional, Sequence, Set, Type, Union
 
 import yaml
 
@@ -173,10 +175,17 @@ class NopeInvocationTarget:
     def __init__(self, target_manifest: NopeInvocationTargetManifest):
         self._target_manifest = target_manifest
 
-    # TODO: infer this from invoke args
     @property
-    @abstractmethod
-    def required_resource_keys(self) -> set: ...
+    def required_resource_keys(self) -> Set[str]:
+        # calling inner property to cache property while
+        # still allowing a user to override this
+        return self._cached_required_resource_keys
+
+    @cached_property
+    def _cached_required_resource_keys(self) -> Set[str]:
+        invoke_method = getattr(self, "invoke")
+        parameters = inspect.signature(invoke_method).parameters
+        return {param for param in parameters if param != "context"}
 
     @property
     def target_manifest(self) -> NopeInvocationTargetManifest:
