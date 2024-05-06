@@ -201,11 +201,8 @@ class TutorialSubprocessInvocationTarget(NopeSubprocessInvocationTarget):
 
 class TutorialProject(NopeProject):
     @classmethod
-    def map_manifest_to_target_class(cls, target_type: str, full_manifest: dict) -> Type:
-        if target_type == "subprocess":
-            return TutorialSubprocessInvocationTarget
-
-        raise Exception(f"Target type {target_type} not supported by {cls.__name__}")
+    def invocation_target_map(cls) -> dict:
+        return {"subprocess" : TutorialSubprocessInvocationTarget}
 ```
 
 Next we want to do a similar thing at the asset level. For that we override a `NopeAssetManifest`, and in similar fashion, override a class method in our `TutorialProject` class.
@@ -253,14 +250,11 @@ And now change your project code to return that class when appropriate and inclu
 # definitions.py
 class TutorialProject(NopeProject):
     @classmethod
-    def map_manifest_to_target_class(cls, target_type: str, full_manifest: dict) -> Type:
-        if target_type == "fancy":
-            return FancyInvocationTarget
-        elif target_type == "subprocess":
-            return TutorialSubprocessInvocationTarget
-
-        raise Exception(f"Target type {target_type} not supported by {cls.__name__}")
-
+    def invocation_target_map(cls) -> dict:
+        return {
+            "fancy" : FancyInvocationTarget
+            "subprocess": TutorialSubprocessInvocationTarget 
+        }
 
 defs = TutorialProject.make_definitions(
     defs_path=Path(__file__).resolve().parent / Path("defs"),
