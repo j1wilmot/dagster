@@ -13,14 +13,14 @@ aniso8601==9.0.1
 ansicolors==1.1.8
 anyio==4.3.0
 apache-airflow==2.7.3
-apache-airflow-providers-apache-spark==4.7.2
-apache-airflow-providers-cncf-kubernetes==8.1.1
-apache-airflow-providers-common-sql==1.12.0
+apache-airflow-providers-apache-spark==4.8.0
+apache-airflow-providers-cncf-kubernetes==8.2.0
+apache-airflow-providers-common-sql==1.13.0
 apache-airflow-providers-docker==3.9.1
-apache-airflow-providers-ftp==3.8.0
+apache-airflow-providers-ftp==3.9.0
 apache-airflow-providers-http==4.1.0
-apache-airflow-providers-imap==3.5.0
-apache-airflow-providers-sqlite==3.7.1
+apache-airflow-providers-imap==3.6.0
+apache-airflow-providers-sqlite==3.8.0
 apeye==1.4.1
 apeye-core==1.1.5
 apispec==6.6.1
@@ -44,23 +44,23 @@ autoflake==2.3.1
 -e python_modules/automation
 avro==1.11.3
 avro-gen3==0.7.12
-aws-sam-translator==1.87.0
+aws-sam-translator==1.88.0
 aws-xray-sdk==2.13.0
 azure-core==1.30.1
 azure-identity==1.16.0
 azure-storage-blob==12.19.1
 azure-storage-file-datalake==12.14.0
-babel==2.14.0
+babel==2.15.0
 backoff==2.2.1
-bcrypt==4.1.2
+bcrypt==4.1.3
 beautifulsoup4==4.12.3
 billiard==4.2.0
 bitmath==1.3.3.1
 bleach==6.1.0
-blinker==1.8.1
+blinker==1.8.2
 bokeh==3.4.1
-boto3==1.34.97
-botocore==1.34.97
+boto3==1.34.99
+botocore==1.34.99
 buildkite-test-collector==0.1.7
 cachecontrol==0.14.0
 cached-property==1.5.2
@@ -91,10 +91,10 @@ configupdater==3.2
 confluent-kafka==2.3.0
 connexion==2.14.2
 contourpy==1.2.1
-coverage==7.5.0
+coverage==7.5.1
 cron-descriptor==1.4.3
 croniter==2.0.5
-cryptography==42.0.5
+cryptography==42.0.7
 cssutils==2.10.2
 cycler==0.12.1
 -e python_modules/dagit
@@ -160,8 +160,8 @@ cycler==0.12.1
 -e python_modules/libraries/dagster-wandb
 -e python_modules/dagster-webserver
 -e python_modules/libraries/dagstermill
-dask==2024.4.2
-dask-expr==1.0.14
+dask==2024.5.0
+dask-expr==1.1.0
 dask-jobqueue==0.8.5
 dask-kubernetes==2022.9.0
 dask-yarn==0.9
@@ -188,7 +188,7 @@ dict2css==0.3.0.post1
 diff-match-patch==20200713
 dill==0.3.8
 distlib==0.3.8
-distributed==2024.4.2
+distributed==2024.5.0
 distro==1.9.0
 dlt==0.4.3
 dnspython==2.6.1
@@ -215,8 +215,8 @@ filelock==3.14.0
 flask==2.2.5
 flask-appbuilder==4.3.6
 flask-babel==2.0.0
-flask-caching==2.2.0
-flask-cors==4.0.0
+flask-caching==2.3.0
+flask-cors==4.0.1
 flask-jwt-extended==4.6.0
 flask-limiter==3.6.0
 flask-login==0.6.3
@@ -232,11 +232,11 @@ gitdb==4.0.11
 gitpython==3.1.43
 giturlparse==0.12.0
 google-api-core==2.19.0
-google-api-python-client==2.127.0
+google-api-python-client==2.128.0
 google-auth==2.29.0
 google-auth-httplib2==0.2.0
 google-auth-oauthlib==1.2.0
-google-cloud-bigquery==3.21.0
+google-cloud-bigquery==3.22.0
 google-cloud-core==2.4.1
 google-cloud-storage==2.16.0
 google-crc32c==1.5.0
@@ -263,7 +263,7 @@ httptools==0.6.1
 httpx==0.27.0
 humanfriendly==10.0
 humanize==4.9.0
-hypothesis==6.100.2
+hypothesis==6.100.5
 idna==3.7
 ijson==3.2.3
 imagesize==1.4.1
@@ -280,7 +280,7 @@ isodate==0.6.1
 isoduration==20.11.0
 itsdangerous==2.2.0
 jedi==0.19.1
-jinja2==3.1.3
+jinja2==3.1.4
 jmespath==1.0.1
 joblib==1.4.2
 jschema-to-python==1.2.3
@@ -313,10 +313,10 @@ kubernetes==29.0.0
 kubernetes-asyncio==29.0.0
 langchain==0.1.11
 langchain-community==0.0.34
-langchain-core==0.1.50
+langchain-core==0.1.52
 langchain-openai==0.1.3
 langchain-text-splitters==0.0.1
-langsmith==0.1.53
+langsmith==0.1.54
 lazy-object-proxy==1.10.0
 leather==0.4.0
 limits==3.11.0
@@ -374,7 +374,7 @@ objgraph==3.6.1
 onnx==1.16.0
 onnxconverter-common==1.13.0
 onnxruntime==1.17.3
-openai==1.25.1
+openai==1.26.0
 openapi-schema-validator==0.6.2
 openapi-spec-validator==0.7.1
 opentelemetry-api==1.24.0
@@ -393,14 +393,14 @@ packaging==23.2
 pandas==2.0.3
 pandas-gbq==0.22.0
 pandas-stubs==2.2.1.240316
-pandera==0.18.3
+pandera==0.19.0
 pandocfilters==1.5.1
 papermill==2.6.0
 papermill-origami==0.0.30
 paramiko==3.4.0
 parsedatetime==2.6
 parso==0.8.4
-partd==1.4.1
+partd==1.4.2
 path==16.14.0
 pathable==0.4.3
 pathspec==0.11.2
@@ -415,7 +415,7 @@ platformdirs==4.2.1
 plotly==5.22.0
 pluggy==1.5.0
 ply==3.11
-polars==0.20.23
+polars==0.20.24
 portalocker==2.8.2
 prison==0.2.1
 progressbar2==4.4.2
@@ -439,7 +439,7 @@ pycparser==2.22
 pydantic==1.10.15
 pydata-google-auth==1.8.2
 pyflakes==3.2.0
-pygments==2.17.2
+pygments==2.18.0
 pyjwt==2.8.0
 pynacl==1.5.0
 pyopenssl==24.1.0
@@ -485,7 +485,7 @@ rfc3339-validator==0.1.4
 rfc3986-validator==0.1.1
 rich==13.7.1
 rich-argparse==1.4.0
-rpds-py==0.18.0
+rpds-py==0.18.1
 rsa==4.9
 ruamel-yaml==0.17.17
 s3transfer==0.10.1
@@ -498,7 +498,7 @@ selenium==4.20.0
 semver==3.0.2
 send2trash==1.8.3
 sending==0.3.0
-sentry-sdk==2.0.1
+sentry-sdk==2.1.1
 setproctitle==1.3.3
 setuptools==69.5.1
 shellingham==1.5.4
@@ -531,7 +531,7 @@ sphinxcontrib-serializinghtml==1.1.10
 sqlalchemy==1.4.52
 sqlalchemy-jsonfield==1.0.2
 sqlalchemy-utils==0.41.2
-sqlglot==23.12.2
+sqlglot==23.14.0
 sqlglotrs==0.2.0
 sqlparse==0.5.0
 sshpubkeys==3.3.1
@@ -544,7 +544,7 @@ syrupy==4.6.1
 tabledata==1.3.3
 tabulate==0.9.0
 tblib==3.0.0
-tenacity==8.2.3
+tenacity==8.3.0
 termcolor==2.4.0
 terminado==0.18.1
 text-unidecode==1.3
