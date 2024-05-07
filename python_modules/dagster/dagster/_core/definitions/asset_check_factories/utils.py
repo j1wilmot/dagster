@@ -11,7 +11,9 @@ from dagster._core.definitions.decorators.asset_check_decorator import (
 from dagster._core.definitions.metadata import JsonMetadataValue
 from dagster._core.event_api import AssetRecordsFilter, EventLogRecord
 from dagster._core.events import DagsterEventType
-from dagster._core.execution.context.compute import AssetCheckExecutionContext
+from dagster._core.execution.context.compute import (
+    AssetExecutionContext,
+)
 from dagster._core.instance import DagsterInstance
 from dagster._utils.security import non_secure_md5_hash_str
 
@@ -148,7 +150,7 @@ def retrieve_timestamp_from_record(asset_record: EventLogRecord) -> float:
 
 
 def get_last_updated_timestamp(
-    record: Optional[EventLogRecord], context: AssetCheckExecutionContext
+    record: Optional[EventLogRecord], context: AssetExecutionContext
 ) -> Optional[float]:
     if record is None:
         return None
