@@ -1,5 +1,5 @@
 import datetime
-from typing import Any, Dict, Iterable, Optional, Sequence, Union, cast
+from typing import Any, Dict, Optional, Sequence, Union, cast
 
 import pendulum
 
@@ -9,7 +9,7 @@ from dagster._core.definitions.asset_check_result import AssetCheckResult
 from dagster._core.definitions.asset_check_spec import AssetCheckSeverity
 from dagster._core.definitions.asset_checks import AssetChecksDefinition
 from dagster._core.definitions.assets import AssetsDefinition, SourceAsset
-from dagster._core.definitions.events import AssetKey, CoercibleToAssetKey
+from dagster._core.definitions.events import CoercibleToAssetKey
 from dagster._core.definitions.factory.section import (
     ExecutableAssetGraphSection,
     SectionExecuteResult,
@@ -21,7 +21,6 @@ from dagster._core.definitions.metadata import (
 )
 from dagster._core.execution.context.compute import (
     AssetCheckExecutionContext,
-    AssetExecutionContext,
 )
 from dagster._utils.schedules import (
     get_latest_completed_cron_tick,
@@ -41,8 +40,9 @@ from ..utils import (
     LOWER_BOUND_TIMESTAMP_METADATA_KEY,
     TIMEZONE_PARAM_KEY,
     assets_to_keys,
+    create_freshness_check_specs,
     ensure_no_duplicate_assets,
-    freshness_multi_asset_check,
+    freshness_section_friendy_name,
     get_last_updated_timestamp,
     retrieve_latest_record,
     seconds_in_words,
@@ -144,38 +144,50 @@ def build_last_update_freshness_checks(
     check.inst_param(severity, "severity", AssetCheckSeverity)
     check.sequence_param(assets, "assets")
     ensure_no_duplicate_assets(assets)
-    return _build_freshness_multi_check(
-        asset_keys=assets_to_keys(assets),
+    return LastUpdateFreshnessCheckSection(
+        assets=assets,
         deadline_cron=deadline_cron,
         timezone=timezone,
         severity=severity,
         lower_bound_delta=lower_bound_delta,
-    )
+    ).to_asset_checks_def()
 
 
-class FreshnessCheckCollection(ExecutableAssetGraphSection):
+class LastUpdateFreshnessCheckSection(ExecutableAssetGraphSection):
     def __init__(
         self,
-        asset_keys: Sequence[AssetKey],
-        deadline_cron: Optional[str],
-        timezone: str,
-        severity: AssetCheckSeverity,
+        assets: Sequence[Union[CoercibleToAssetKey, AssetsDefinition, SourceAsset]],
         lower_bound_delta: datetime.timedelta,
+        deadline_cron: Optional[str] = None,
+        timezone: str = DEFAULT_FRESHNESS_TIMEZONE,
+        severity: AssetCheckSeverity = DEFAULT_FRESHNESS_SEVERITY,
     ) -> None:
-        self._asset_keys = asset_keys
-        self._deadline_cron = deadline_cron
-        self._timezone = timezone
-        self._severity = severity
-        self._lower_bound_delta = lower_bound_delta
+        self.deadline_cron = deadline_cron
+        self.timezone = timezone
+        self.severity = severity
+        self.lower_bound_delta = lower_bound_delta
 
-    # def ass
-    def to_assets_def(self) -> AssetsDefinition:
-        return super().to_assets_def()
+        params_metadata: dict[str, Any] = {
+            TIMEZONE_PARAM_KEY: timezone,
+            LOWER_BOUND_DELTA_PARAM_KEY: lower_bound_delta.total_seconds(),
+        }
+        if deadline_cron:
+            params_metadata[DEADLINE_CRON_PARAM_KEY] = deadline_cron
 
-    def execute(self, context: AssetExecutionContext, **kwargs) -> SectionExecuteResult:
-        deadline_cron = self._deadline_cron
-        timezone = self._timezone
-        lower_bound_delta = self._lower_bound_delta
+        self.params_metadata = params_metadata
+
+        asset_keys = assets_to_keys(assets)
+
+        super().__init__(
+            specs=create_freshness_check_specs(asset_keys, params_metadata),
+            subsettable=True,
+            friendly_name=freshness_section_friendy_name(asset_keys),
+        )
+
+    def execute(self, context: AssetCheckExecutionContext) -> SectionExecuteResult:
+        deadline_cron = self.deadline_cron
+        timezone = self.timezone
+        lower_bound_delta = self.lower_bound_delta
 
         for check_key in context.selected_asset_check_keys:
             asset_key = check_key.asset_key
@@ -200,14 +212,14 @@ class FreshnessCheckCollection(ExecutableAssetGraphSection):
             latest_record = retrieve_latest_record(
                 instance=context.instance, asset_key=asset_key, partition_key=None
             )
-            update_timestamp = get_last_updated_timestamp(latest_record, context)
+            update_timestamp = get_last_updated_timestamp(latest_record, context.log)
             passed = (
                 update_timestamp is not None
                 and update_timestamp >= last_update_time_lower_bound.timestamp()
             )
 
             metadata: Dict[str, MetadataValue] = {
-                FRESHNESS_PARAMS_METADATA_KEY: JsonMetadataValue(params_metadata),
+                FRESHNESS_PARAMS_METADATA_KEY: JsonMetadataValue(self.params_metadata),
                 LOWER_BOUND_TIMESTAMP_METADATA_KEY: TimestampMetadataValue(
                     last_update_time_lower_bound.timestamp()
                 ),
@@ -242,102 +254,10 @@ class FreshnessCheckCollection(ExecutableAssetGraphSection):
                     current_timestamp=current_timestamp,
                     update_timestamp=update_timestamp,
                 ),
-                severity=severity,
+                severity=self.severity,
                 asset_key=asset_key,
                 metadata=metadata,
             )
-        ...
-
-
-def _build_freshness_multi_check(
-    asset_keys: Sequence[AssetKey],
-    deadline_cron: Optional[str],
-    timezone: str,
-    severity: AssetCheckSeverity,
-    lower_bound_delta: datetime.timedelta,
-) -> AssetChecksDefinition:
-    params_metadata: dict[str, Any] = {
-        TIMEZONE_PARAM_KEY: timezone,
-        LOWER_BOUND_DELTA_PARAM_KEY: lower_bound_delta.total_seconds(),
-    }
-    if deadline_cron:
-        params_metadata[DEADLINE_CRON_PARAM_KEY] = deadline_cron
-
-    @freshness_multi_asset_check(
-        params_metadata=JsonMetadataValue(params_metadata), asset_keys=asset_keys
-    )
-    def the_check(context: AssetCheckExecutionContext) -> Iterable[AssetCheckResult]:
-        for check_key in context.selected_asset_check_keys:
-            asset_key = check_key.asset_key
-            current_timestamp = pendulum.now("UTC").timestamp()
-
-            current_time_in_freshness_tz = pendulum.from_timestamp(current_timestamp, tz=timezone)
-            latest_completed_cron_tick = (
-                get_latest_completed_cron_tick(
-                    deadline_cron, current_time_in_freshness_tz, timezone
-                )
-                if deadline_cron
-                else None
-            )
-            deadline = check.inst_param(
-                latest_completed_cron_tick or current_time_in_freshness_tz,
-                "deadline",
-                datetime.datetime,
-            )
-
-            last_update_time_lower_bound = cast(datetime.datetime, deadline - lower_bound_delta)
-
-            latest_record = retrieve_latest_record(
-                instance=context.instance, asset_key=asset_key, partition_key=None
-            )
-            update_timestamp = get_last_updated_timestamp(latest_record, context)
-            passed = (
-                update_timestamp is not None
-                and update_timestamp >= last_update_time_lower_bound.timestamp()
-            )
-
-            metadata: Dict[str, MetadataValue] = {
-                FRESHNESS_PARAMS_METADATA_KEY: JsonMetadataValue(params_metadata),
-                LOWER_BOUND_TIMESTAMP_METADATA_KEY: TimestampMetadataValue(
-                    last_update_time_lower_bound.timestamp()
-                ),
-            }
-            if latest_completed_cron_tick:
-                metadata[LATEST_CRON_TICK_METADATA_KEY] = TimestampMetadataValue(
-                    latest_completed_cron_tick.timestamp()
-                )
-            if passed:
-                # If the asset is fresh, we can determine when it has the possibility of becoming stale again.
-                # In the case of a deadline cron, this is the next cron tick after the current time.
-                # In the case of just a lower_bound_delta, this is the last update time plus the
-                # lower_bound_delta.
-                fresh_until = (
-                    get_next_cron_tick(
-                        deadline_cron, current_time_in_freshness_tz, timezone
-                    ).timestamp()
-                    if deadline_cron
-                    else check.not_none(update_timestamp) + lower_bound_delta.total_seconds()
-                )
-                metadata[FRESH_UNTIL_METADATA_KEY] = TimestampMetadataValue(fresh_until)
-            if update_timestamp:
-                metadata[LAST_UPDATED_TIMESTAMP_METADATA_KEY] = TimestampMetadataValue(
-                    update_timestamp
-                )
-
-            yield AssetCheckResult(
-                passed=passed,
-                description=construct_description(
-                    passed,
-                    last_update_time_lower_bound=last_update_time_lower_bound.timestamp(),
-                    current_timestamp=current_timestamp,
-                    update_timestamp=update_timestamp,
-                ),
-                severity=severity,
-                asset_key=asset_key,
-                metadata=metadata,
-            )
-
-    return the_check
 
 
 def construct_description(
