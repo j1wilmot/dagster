@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional
 import yaml
 from dagster import AssetsDefinition
 from dagster._core.definitions.asset_spec import AssetSpec
-from dagster._core.definitions.factory.section import ExecutableAssetGraphEntitySet
+from dagster._core.definitions.factory.entity_set import ExecutableAssetGraphEntitySet
 from dagster._core.execution.context.compute import AssetExecutionContext
 from dagster._utils import file_relative_path
 
