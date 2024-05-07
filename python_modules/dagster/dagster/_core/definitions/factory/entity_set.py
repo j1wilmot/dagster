@@ -42,7 +42,7 @@ def unique_id_from_key(keys: Sequence[AssetKeyOrCheckKey]) -> str:
     return non_secure_md5_hash_str(",".join([str(key) for key in sorted_keys]).encode())[:8]
 
 
-SectionExecuteResult = Iterable[Union[MaterializeResult, AssetCheckResult, ObserveResult]]
+EntitySetExecuteResult = Iterable[Union[MaterializeResult, AssetCheckResult, ObserveResult]]
 
 
 class ExecutableAssetGraphEntitySet(ABC):
@@ -152,4 +152,4 @@ class ExecutableAssetGraphEntitySet(ABC):
     @abstractmethod
     def execute(
         self, context: Union[AssetCheckExecutionContext, AssetExecutionContext], **kwargs
-    ) -> SectionExecuteResult: ...
+    ) -> EntitySetExecuteResult: ...
