@@ -2262,6 +2262,8 @@ input LaunchBackfillParams {
   allPartitions: Boolean
   tags: [ExecutionTag!]
   forceSynchronousSubmission: Boolean
+  title: String
+  description: String
 }
 
 input PartitionSetSelector {
@@ -2758,6 +2760,8 @@ type PartitionBackfill {
   hasResumePermission: Boolean!
   user: String
   tags: [PipelineTag!]!
+  title: String
+  description: String
 }
 
 enum BulkActionStatus {
