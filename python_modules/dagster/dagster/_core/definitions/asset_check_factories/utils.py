@@ -4,10 +4,6 @@ from typing import Any, Dict, Iterator, Optional, Sequence, Union, cast
 from dagster import _check as check
 from dagster._core.definitions.asset_check_spec import AssetCheckSeverity, AssetCheckSpec
 from dagster._core.definitions.asset_checks import AssetChecksDefinition
-from dagster._core.definitions.decorators.asset_check_decorator import (
-    MultiAssetCheckFunction,
-    multi_asset_check,
-)
 from dagster._core.definitions.metadata import JsonMetadataValue
 from dagster._core.event_api import AssetRecordsFilter, EventLogRecord
 from dagster._core.events import DagsterEventType
@@ -261,22 +257,3 @@ def create_freshness_check_specs(
         )
         for asset_key in asset_keys
     ]
-
-
-def freshness_multi_asset_check(params_metadata: JsonMetadataValue, asset_keys: Sequence[AssetKey]):
-    def inner(fn: MultiAssetCheckFunction) -> AssetChecksDefinition:
-        return multi_asset_check(
-            specs=[
-                AssetCheckSpec(
-                    "freshness_check",
-                    asset=asset_key,
-                    metadata={FRESHNESS_PARAMS_METADATA_KEY: params_metadata},
-                    description="Evaluates freshness for targeted asset.",
-                )
-                for asset_key in asset_keys
-            ],
-            can_subset=True,
-            name=f"freshness_check_{unique_id_from_asset_keys(asset_keys)}",
-        )(fn)
-
-    return inner
