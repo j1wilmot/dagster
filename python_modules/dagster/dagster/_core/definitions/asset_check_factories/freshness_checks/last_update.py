@@ -1,6 +1,5 @@
 import datetime
 from typing import Any, Dict, Optional, Sequence, Union, cast
-from xml.dom.minidom import Entity
 
 import pendulum
 
@@ -13,7 +12,7 @@ from dagster._core.definitions.assets import AssetsDefinition, SourceAsset
 from dagster._core.definitions.events import CoercibleToAssetKey
 from dagster._core.definitions.factory.entity_set import (
     EntitySetExecuteResult,
-    ExecutableAssetGraphEntitySet
+    ExecutableAssetGraphEntitySet,
 )
 from dagster._core.definitions.metadata import (
     JsonMetadataValue,
@@ -43,7 +42,7 @@ from ..utils import (
     assets_to_keys,
     create_freshness_check_specs,
     ensure_no_duplicate_assets,
-    freshness_section_friendy_name,
+    freshness_section_friendly_name,
     get_last_updated_timestamp,
     retrieve_latest_record,
     seconds_in_words,
@@ -145,7 +144,7 @@ def build_last_update_freshness_checks(
     check.inst_param(severity, "severity", AssetCheckSeverity)
     check.sequence_param(assets, "assets")
     ensure_no_duplicate_assets(assets)
-    return LastUpdateFreshnessCheckSection(
+    return LastUpdateFreshnessCheckSet(
         assets=assets,
         deadline_cron=deadline_cron,
         timezone=timezone,
@@ -154,7 +153,7 @@ def build_last_update_freshness_checks(
     ).to_asset_checks_def()
 
 
-class LastUpdateFreshnessCheckSection(ExecutableAssetGraphEntitySet):
+class LastUpdateFreshnessCheckSet(ExecutableAssetGraphEntitySet):
     def __init__(
         self,
         assets: Sequence[Union[CoercibleToAssetKey, AssetsDefinition, SourceAsset]],
@@ -182,7 +181,7 @@ class LastUpdateFreshnessCheckSection(ExecutableAssetGraphEntitySet):
         super().__init__(
             specs=create_freshness_check_specs(asset_keys, params_metadata),
             subsettable=True,
-            friendly_name=freshness_section_friendy_name(asset_keys),
+            friendly_name=freshness_section_friendly_name(asset_keys),
         )
 
     def execute(self, context: AssetCheckExecutionContext) -> EntitySetExecuteResult:

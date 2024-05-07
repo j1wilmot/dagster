@@ -11,8 +11,8 @@ from dagster._core.definitions.asset_key import AssetKey
 from dagster._core.definitions.assets import AssetsDefinition, SourceAsset
 from dagster._core.definitions.events import CoercibleToAssetKey
 from dagster._core.definitions.factory.entity_set import (
+    EntitySetExecuteResult,
     ExecutableAssetGraphEntitySet,
-    EntitySetExecuteResult
 )
 from dagster._core.definitions.metadata import (
     JsonMetadataValue,
@@ -42,7 +42,7 @@ from ..utils import (
     TIMEZONE_PARAM_KEY,
     assets_to_keys,
     ensure_no_duplicate_assets,
-    freshness_section_friendy_name,
+    freshness_section_friendly_name,
     get_last_updated_timestamp,
     retrieve_latest_record,
 )
@@ -62,7 +62,7 @@ def create_freshness_check_specs(
     ]
 
 
-class TimePartitionFreshnessSection(ExecutableAssetGraphEntitySet):
+class TimePartitionFreshnessCheckSet(ExecutableAssetGraphEntitySet):
     def __init__(
         self,
         *,
@@ -82,7 +82,7 @@ class TimePartitionFreshnessSection(ExecutableAssetGraphEntitySet):
         super().__init__(
             specs=create_freshness_check_specs(asset_keys, self.params_metadata),
             subsettable=True,
-            friendly_name=freshness_section_friendy_name(asset_keys),
+            friendly_name=freshness_section_friendly_name(asset_keys),
         )
 
     def execute(self, context: AssetCheckExecutionContext) -> EntitySetExecuteResult:
@@ -230,7 +230,7 @@ def build_time_partition_freshness_checks(
     check.inst_param(severity, "severity", AssetCheckSeverity)
     check.sequence_param(assets, "assets")
     ensure_no_duplicate_assets(assets)
-    return TimePartitionFreshnessSection(
+    return TimePartitionFreshnessCheckSet(
         assets=assets, deadline_cron=deadline_cron, timezone=timezone, severity=severity
     ).to_asset_checks_def()
 

@@ -245,7 +245,7 @@ def unique_id_from_asset_keys(asset_keys: Sequence[AssetKey]) -> str:
     )[:8]
 
 
-def freshness_section_friendy_name(asset_keys: Sequence[AssetKey]) -> str:
+def freshness_section_friendly_name(asset_keys: Sequence[AssetKey]) -> str:
     return f"freshness_check_{unique_id_from_asset_keys(asset_keys)}"
 
 
