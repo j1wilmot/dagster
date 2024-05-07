@@ -87,6 +87,13 @@ class ExecutableAssetGraphSection(ABC):
     def compute_kind(self) -> Optional[str]:
         return self._compute_kind
 
+    def _only_required_resources(self, context: AssetExecutionContext):
+        return {
+            k: v
+            for k, v in context.resources.original_resource_dict.items()
+            if k in self.required_resource_keys
+        }
+
     def to_assets_def(self) -> AssetsDefinition:
         @multi_asset(
             specs=self.asset_specs,
@@ -98,7 +105,7 @@ class ExecutableAssetGraphSection(ABC):
             can_subset=self.subsettable,
         )
         def _nope_multi_asset(context: AssetExecutionContext):
-            return self.execute(context=context, **resources_without_io_manager(context))
+            return self.execute(context=context, **self._only_required_resources(context))
 
         return _nope_multi_asset
 
@@ -106,41 +113,3 @@ class ExecutableAssetGraphSection(ABC):
     # Can return anything that the multi_asset decorator can accept, hence typed as Any
     @abstractmethod
     def execute(self, context: AssetExecutionContext, **kwargs) -> SectionExecuteResult: ...
-
-
-# class DefaultExecutableAssetGraphSection(ExecutableAssetGraphSection):
-#     def __init__(
-#         self,
-#         specs: Sequence[AssetSpec],
-#         check_specs: Sequence[AssetCheckSpec],
-#         friendly_name: Optional[str] = None,
-#         subsettable: bool = False,
-#         tags: Optional[dict] = None,
-#         compute_kind: Optional[str] = None,
-#     ):
-#         self._specs = specs
-#         self._check_specs = check_specs
-#         self._tags = tags
-#         self._compute_kind = compute_kind
-#         self._subsettable = subsettable
-#         self._op_name = friendly_name or self.__class__.__name__
-
-#     @property
-#     def asset_specs(self) -> Sequence[AssetSpec]:
-#         return self._specs
-
-#     @property
-#     def asset_check_specs(self) -> Sequence[AssetCheckSpec]:
-#         return self._check_specs
-
-#     @property
-#     def op_name(self) -> str:
-#         return self._op_name
-
-#     @property
-#     def tags(self) -> Optional[dict]:
-#         return self._tags
-
-#     @property
-#     def compute_kind(self) -> Optional[str]:
-#         return self._compute_kind
