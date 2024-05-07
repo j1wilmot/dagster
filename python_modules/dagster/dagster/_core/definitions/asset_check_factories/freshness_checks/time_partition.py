@@ -10,9 +10,9 @@ from dagster._core.definitions.asset_checks import AssetChecksDefinition
 from dagster._core.definitions.asset_key import AssetKey
 from dagster._core.definitions.assets import AssetsDefinition, SourceAsset
 from dagster._core.definitions.events import CoercibleToAssetKey
-from dagster._core.definitions.factory.section import (
-    ExecutableAssetGraphSection,
-    SectionExecuteResult,
+from dagster._core.definitions.factory.entity_set import (
+    ExecutableAssetGraphEntitySet,
+    EntitySetExecuteResult
 )
 from dagster._core.definitions.metadata import (
     JsonMetadataValue,
@@ -62,7 +62,7 @@ def create_freshness_check_specs(
     ]
 
 
-class TimePartitionFreshnessSection(ExecutableAssetGraphSection):
+class TimePartitionFreshnessSection(ExecutableAssetGraphEntitySet):
     def __init__(
         self,
         *,
@@ -85,7 +85,7 @@ class TimePartitionFreshnessSection(ExecutableAssetGraphSection):
             friendly_name=freshness_section_friendy_name(asset_keys),
         )
 
-    def execute(self, context: AssetCheckExecutionContext) -> SectionExecuteResult:
+    def execute(self, context: AssetCheckExecutionContext) -> EntitySetExecuteResult:
         timezone = self._timezone
         deadline_cron = self._deadline_cron
         for check_key in context.selected_asset_check_keys:

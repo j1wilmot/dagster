@@ -1,5 +1,6 @@
 import datetime
 from typing import Any, Dict, Optional, Sequence, Union, cast
+from xml.dom.minidom import Entity
 
 import pendulum
 
@@ -10,9 +11,9 @@ from dagster._core.definitions.asset_check_spec import AssetCheckSeverity
 from dagster._core.definitions.asset_checks import AssetChecksDefinition
 from dagster._core.definitions.assets import AssetsDefinition, SourceAsset
 from dagster._core.definitions.events import CoercibleToAssetKey
-from dagster._core.definitions.factory.section import (
-    ExecutableAssetGraphSection,
-    SectionExecuteResult,
+from dagster._core.definitions.factory.entity_set import (
+    EntitySetExecuteResult,
+    ExecutableAssetGraphEntitySet
 )
 from dagster._core.definitions.metadata import (
     JsonMetadataValue,
@@ -153,7 +154,7 @@ def build_last_update_freshness_checks(
     ).to_asset_checks_def()
 
 
-class LastUpdateFreshnessCheckSection(ExecutableAssetGraphSection):
+class LastUpdateFreshnessCheckSection(ExecutableAssetGraphEntitySet):
     def __init__(
         self,
         assets: Sequence[Union[CoercibleToAssetKey, AssetsDefinition, SourceAsset]],
@@ -184,7 +185,7 @@ class LastUpdateFreshnessCheckSection(ExecutableAssetGraphSection):
             friendly_name=freshness_section_friendy_name(asset_keys),
         )
 
-    def execute(self, context: AssetCheckExecutionContext) -> SectionExecuteResult:
+    def execute(self, context: AssetCheckExecutionContext) -> EntitySetExecuteResult:
         deadline_cron = self.deadline_cron
         timezone = self.timezone
         lower_bound_delta = self.lower_bound_delta
