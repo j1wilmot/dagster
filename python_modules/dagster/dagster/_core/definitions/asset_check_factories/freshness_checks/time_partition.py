@@ -12,7 +12,7 @@ from dagster._core.definitions.assets import AssetsDefinition, SourceAsset
 from dagster._core.definitions.events import CoercibleToAssetKey
 from dagster._core.definitions.factory.entity_set import (
     EntitySetExecuteResult,
-    ExecutableAssetGraphEntitySet,
+    ExecutableEntitySet,
 )
 from dagster._core.definitions.metadata import (
     JsonMetadataValue,
@@ -62,7 +62,7 @@ def create_freshness_check_specs(
     ]
 
 
-class TimePartitionFreshnessCheckSet(ExecutableAssetGraphEntitySet):
+class TimePartitionFreshnessCheckSet(ExecutableEntitySet):
     def __init__(
         self,
         *,
