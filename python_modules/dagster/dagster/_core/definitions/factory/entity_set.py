@@ -54,6 +54,10 @@ class ExecutableEntitySet(ABC):
         tags: Optional[dict] = None,
         friendly_name: Optional[str] = None,
         partitions_def: Optional[PartitionsDefinition] = None,
+        # TODO implement these
+        # backfill_policy: Optional[BackfillPolicy] = None,
+        # retry_policy: Optional[RetryPolicy] = None,
+        # config_schema: Optional[UserConfigSchema] = None,
     ):
         self.specs = specs
         self._compute_kind = compute_kind
