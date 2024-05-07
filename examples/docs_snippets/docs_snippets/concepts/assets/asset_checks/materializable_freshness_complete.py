@@ -6,9 +6,6 @@ from dagster import (
     build_last_update_freshness_checks,
     build_sensor_for_freshness_checks,
 )
-from dagster._core.definitions.asset_check_factories.freshness_checks.last_update import (
-    LastUpdateFreshnessCheckSection,
-)
 
 
 @asset
