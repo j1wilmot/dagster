@@ -9,6 +9,7 @@ from typing import (
     Union,
 )
 
+from dagster import _check as check
 from dagster._core.definitions.asset_check_result import AssetCheckResult
 from dagster._core.definitions.asset_check_spec import AssetCheckSpec
 from dagster._core.definitions.asset_checks import AssetChecksDefinition
@@ -17,6 +18,7 @@ from dagster._core.definitions.assets import AssetsDefinition
 from dagster._core.definitions.base_asset_graph import AssetKeyOrCheckKey
 from dagster._core.definitions.decorators.asset_check_decorator import multi_asset_check
 from dagster._core.definitions.decorators.asset_decorator import multi_asset
+from dagster._core.definitions.partition import PartitionsDefinition
 from dagster._core.definitions.result import MaterializeResult, ObserveResult
 from dagster._core.execution.context.compute import (
     AssetCheckExecutionContext,
@@ -43,7 +45,7 @@ def unique_id_from_key(keys: Sequence[AssetKeyOrCheckKey]) -> str:
 SectionExecuteResult = Iterable[Union[MaterializeResult, AssetCheckResult, ObserveResult]]
 
 
-class ExecutableAssetGraphSection(ABC):
+class ExecutableAssetGraphEntitySet(ABC):
     def __init__(
         self,
         specs: Sequence[Union[AssetSpec, AssetCheckSpec]],
@@ -51,12 +53,14 @@ class ExecutableAssetGraphSection(ABC):
         subsettable: bool = False,
         tags: Optional[dict] = None,
         friendly_name: Optional[str] = None,
+        partitions_def: Optional[PartitionsDefinition] = None,
     ):
         self.specs = specs
         self._compute_kind = compute_kind
         self._subsettable = subsettable
         self._tags = tags or {}
         self._friendly_name = friendly_name or unique_id_from_key([spec.key for spec in self.specs])
+        self._partitions_def = partitions_def
 
     @property
     def required_resource_keys(self) -> Set[str]:
@@ -108,6 +112,7 @@ class ExecutableAssetGraphSection(ABC):
                 required_resource_keys=self.required_resource_keys,
                 compute_kind=self.compute_kind,
                 can_subset=self.subsettable,
+                partitions_def=self._partitions_def,
             )
             def _nope_multi_asset(context: AssetExecutionContext):
                 return self.execute(
@@ -120,6 +125,11 @@ class ExecutableAssetGraphSection(ABC):
             return self.to_asset_checks_def()
 
     def to_asset_checks_def(self) -> AssetChecksDefinition:
+        check.invariant(
+            not self._partitions_def,
+            "PartitionsDefinition not supported for check-only ExecutableAssetGraphEntitySet",
+        )
+
         @multi_asset_check(
             specs=self.asset_check_specs,
             name=self.op_name,
@@ -137,9 +147,9 @@ class ExecutableAssetGraphSection(ABC):
         return _nope_multi_asset_check
 
     # Resources as kwargs. Must match set in required_resource_keys.
-    # Can return anything that the multi_asset decorator can accept, hence typed as Any
+    # If the user has only specified asset checks, they can override typed as AssetCheckExecutionContext
+    # instead. It would be preferable to have a unified context.
     @abstractmethod
-    # def execute(self, context: AssetExecutionContext, **kwargs) -> SectionExecuteResult: ...
     def execute(
         self, context: Union[AssetCheckExecutionContext, AssetExecutionContext], **kwargs
     ) -> SectionExecuteResult: ...
