@@ -11,12 +11,17 @@ from typing import (
 
 from dagster._core.definitions.asset_check_result import AssetCheckResult
 from dagster._core.definitions.asset_check_spec import AssetCheckSpec
+from dagster._core.definitions.asset_checks import AssetChecksDefinition
 from dagster._core.definitions.asset_spec import AssetSpec
 from dagster._core.definitions.assets import AssetsDefinition
 from dagster._core.definitions.base_asset_graph import AssetKeyOrCheckKey
+from dagster._core.definitions.decorators.asset_check_decorator import multi_asset_check
 from dagster._core.definitions.decorators.asset_decorator import multi_asset
 from dagster._core.definitions.result import MaterializeResult, ObserveResult
-from dagster._core.execution.context.compute import AssetExecutionContext
+from dagster._core.execution.context.compute import (
+    AssetCheckExecutionContext,
+    AssetExecutionContext,
+)
 from dagster._utils.security import non_secure_md5_hash_str
 
 
@@ -45,11 +50,13 @@ class ExecutableAssetGraphSection(ABC):
         compute_kind: Optional[str] = None,
         subsettable: bool = False,
         tags: Optional[dict] = None,
+        friendly_name: Optional[str] = None,
     ):
         self.specs = specs
         self._compute_kind = compute_kind
         self._subsettable = subsettable
         self._tags = tags or {}
+        self._friendly_name = friendly_name or unique_id_from_key([spec.key for spec in self.specs])
 
     @property
     def required_resource_keys(self) -> Set[str]:
@@ -73,7 +80,7 @@ class ExecutableAssetGraphSection(ABC):
 
     @property
     def op_name(self) -> str:
-        return unique_id_from_key([spec.key for spec in self.specs])
+        return self._friendly_name
 
     @property
     def tags(self) -> Optional[dict]:
@@ -87,29 +94,52 @@ class ExecutableAssetGraphSection(ABC):
     def compute_kind(self) -> Optional[str]:
         return self._compute_kind
 
-    def _only_required_resources(self, context: AssetExecutionContext):
-        return {
-            k: v
-            for k, v in context.resources.original_resource_dict.items()
-            if k in self.required_resource_keys
-        }
+    def _only_required_resources(self, original_resource_dict: dict):
+        return {k: v for k, v in original_resource_dict.items() if k in self.required_resource_keys}
 
     def to_assets_def(self) -> AssetsDefinition:
-        @multi_asset(
-            specs=self.asset_specs,
-            check_specs=self.asset_check_specs,
+        if self.asset_specs:
+
+            @multi_asset(
+                specs=self.asset_specs,
+                check_specs=self.asset_check_specs,
+                name=self.op_name,
+                op_tags=self.tags,
+                required_resource_keys=self.required_resource_keys,
+                compute_kind=self.compute_kind,
+                can_subset=self.subsettable,
+            )
+            def _nope_multi_asset(context: AssetExecutionContext):
+                return self.execute(
+                    context=context,
+                    **self._only_required_resources(context.resources.original_resource_dict),
+                )
+
+            return _nope_multi_asset
+        else:
+            return self.to_asset_checks_def()
+
+    def to_asset_checks_def(self) -> AssetChecksDefinition:
+        @multi_asset_check(
+            specs=self.asset_check_specs,
             name=self.op_name,
             op_tags=self.tags,
             required_resource_keys=self.required_resource_keys,
             compute_kind=self.compute_kind,
             can_subset=self.subsettable,
         )
-        def _nope_multi_asset(context: AssetExecutionContext):
-            return self.execute(context=context, **self._only_required_resources(context))
+        def _nope_multi_asset_check(context: AssetCheckExecutionContext):
+            return self.execute(
+                context=context,
+                **self._only_required_resources(context.resources.original_resource_dict),
+            )
 
-        return _nope_multi_asset
+        return _nope_multi_asset_check
 
     # Resources as kwargs. Must match set in required_resource_keys.
     # Can return anything that the multi_asset decorator can accept, hence typed as Any
     @abstractmethod
-    def execute(self, context: AssetExecutionContext, **kwargs) -> SectionExecuteResult: ...
+    # def execute(self, context: AssetExecutionContext, **kwargs) -> SectionExecuteResult: ...
+    def execute(
+        self, context: Union[AssetCheckExecutionContext, AssetExecutionContext], **kwargs
+    ) -> SectionExecuteResult: ...
