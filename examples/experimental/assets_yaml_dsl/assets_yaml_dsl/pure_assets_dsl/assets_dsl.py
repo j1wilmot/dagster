@@ -1,10 +1,9 @@
 import os
 import shutil
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional
 
 import yaml
 from dagster import AssetsDefinition
-from dagster._core.definitions.asset_check_spec import AssetCheckSpec
 from dagster._core.definitions.asset_spec import AssetSpec
 from dagster._core.definitions.factory.section import ExecutableAssetGraphSection
 from dagster._core.execution.context.compute import AssetExecutionContext
@@ -27,39 +26,21 @@ def load_yaml(relative_path) -> Dict[str, Any]:
 
 class PureDSLAssetGraphSection(ExecutableAssetGraphSection):
     def __init__(self, asset_entry: dict, sql: str, group_name: Optional[str]):
-        self.asset_entry = asset_entry
         self.sql = sql
-        self.group_name = group_name
-
-    @property
-    def asset_specs(self) -> Sequence[AssetSpec]:
-        return [
-            AssetSpec(
-                group_name=self.group_name,
-                key=AssetKey.from_user_string(self.asset_entry["asset_key"]),
-                description=self.asset_entry.get("description"),
-                deps=[
-                    AssetKey.from_user_string(dep_entry)
-                    for dep_entry in self.asset_entry.get("deps", [])
-                ],
-            )
-        ]
-
-    @property
-    def asset_check_specs(self) -> Sequence[AssetCheckSpec]:
-        return []
-
-    @property
-    def op_name(self) -> str:
-        return self.asset_entry["asset_key"].split("/")[-1]
-
-    @property
-    def tags(self) -> Optional[dict]:
-        return None
-
-    @property
-    def compute_kind(self) -> Optional[str]:
-        return "python"
+        super().__init__(
+            specs=[
+                AssetSpec(
+                    group_name=group_name,
+                    key=AssetKey.from_user_string(asset_entry["asset_key"]),
+                    description=asset_entry.get("description"),
+                    deps=[
+                        AssetKey.from_user_string(dep_entry)
+                        for dep_entry in asset_entry.get("deps", [])
+                    ],
+                )
+            ],
+            compute_kind="python",
+        )
 
     def execute(
         self, context: AssetExecutionContext, pipes_subprocess_client: PipesSubprocessClient
