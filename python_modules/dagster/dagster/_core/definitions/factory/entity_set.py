@@ -45,7 +45,7 @@ def unique_id_from_key(keys: Sequence[AssetKeyOrCheckKey]) -> str:
 EntitySetExecuteResult = Iterable[Union[MaterializeResult, AssetCheckResult, ObserveResult]]
 
 
-class ExecutableAssetGraphEntitySet(ABC):
+class ExecutableEntitySet(ABC):
     def __init__(
         self,
         specs: Sequence[Union[AssetSpec, AssetCheckSpec]],

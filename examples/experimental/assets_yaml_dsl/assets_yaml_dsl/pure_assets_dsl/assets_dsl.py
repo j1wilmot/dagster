@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional
 import yaml
 from dagster import AssetsDefinition
 from dagster._core.definitions.asset_spec import AssetSpec
-from dagster._core.definitions.factory.entity_set import ExecutableAssetGraphEntitySet
+from dagster._core.definitions.factory.entity_set import ExecutableEntitySet
 from dagster._core.execution.context.compute import AssetExecutionContext
 from dagster._utils import file_relative_path
 
@@ -24,7 +24,7 @@ def load_yaml(relative_path) -> Dict[str, Any]:
         return yaml.load(ff, Loader=Loader)
 
 
-class PureDSLAsset(ExecutableAssetGraphEntitySet):
+class PureDSLAsset(ExecutableEntitySet):
     def __init__(self, asset_entry: dict, sql: str, group_name: Optional[str]):
         self.sql = sql
         super().__init__(
